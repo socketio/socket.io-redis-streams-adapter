@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist",
+    "allowJs": false,
+    "target": "ES2022", // Node 18 (https://github.com/microsoft/TypeScript/wiki/Node-Target-Mapping)
+    "module": "commonjs",
+    "declaration": true
+  },
+  "include": [
+    "./lib/**/*"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "@socket.io/redis-streams-adapter",
+  "version": "0.0.1",
+  "description": "The Socket.IO adapter based on Redis Streams, allowing to broadcast events between several Socket.IO servers",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:socketio/socket.io-redis-streams-adapter.git"
+  },
+  "files": [
+    "dist/"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "compile": "tsc",
+    "format:check": "prettier --parser typescript --check lib/**/*.ts test/**/*.ts",
+    "format:fix": "prettier --parser typescript --write lib/**/*.ts test/**/*.ts",
+    "prepack": "npm run compile",
+    "test": "npm run format:check && npm run compile && nyc mocha --bail --require ts-node/register test/**/*.ts"
+  },
+  "dependencies": {
+    "@msgpack/msgpack": "~2.8.0",
+    "debug": "~4.3.1"
+  },
+  "peerDependencies": {
+    "socket.io-adapter": "^2.5.2"
+  },
+  "devDependencies": {
+    "@types/expect.js": "^0.3.29",
+    "@types/mocha": "^8.2.1",
+    "@types/node": "^18.15.11",
+    "expect.js": "0.3.1",
+    "mocha": "^10.1.0",
+    "nyc": "^15.1.0",
+    "prettier": "^2.8.7",
+    "redis": "^4.6.5",
+    "socket.io": "^4.6.1",
+    "socket.io-client": "^4.6.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.5"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
