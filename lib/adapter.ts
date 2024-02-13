@@ -1,6 +1,5 @@
 import type { PrivateSessionId, Session } from "socket.io-adapter";
 import { decode, encode } from "@msgpack/msgpack";
-import { commandOptions } from "redis";
 import {
   ClusterAdapter,
   ClusterAdapterOptions,
@@ -8,7 +7,7 @@ import {
   MessageType,
 } from "./cluster-adapter";
 import debugModule from "debug";
-import { hasBinary } from "./util";
+import { hasBinary, XADD, XREAD } from "./util";
 
 const debug = debugModule("socket.io-redis-streams-adapter");
 
@@ -61,23 +60,15 @@ export function createAdapter(
   );
   let offset = "$";
   let polling = false;
+  let shouldClose = false;
 
   async function poll() {
     try {
-      let response = await redisClient.xRead(
-        commandOptions({
-          isolated: true,
-        }),
-        [
-          {
-            key: options.streamName,
-            id: offset,
-          },
-        ],
-        {
-          COUNT: options.readCount,
-          BLOCK: 5000,
-        }
+      let response = await XREAD(
+        redisClient,
+        options.streamName,
+        offset,
+        options.readCount
       );
 
       if (response) {
@@ -98,7 +89,7 @@ export function createAdapter(
       debug("something went wrong while consuming the stream: %s", e.message);
     }
 
-    if (namespaceToAdapters.size > 0 && redisClient.isOpen) {
+    if (namespaceToAdapters.size > 0 && !shouldClose) {
       poll();
     } else {
       polling = false;
@@ -111,6 +102,7 @@ export function createAdapter(
 
     if (!polling) {
       polling = true;
+      shouldClose = false;
       poll();
     }
 
@@ -118,6 +110,10 @@ export function createAdapter(
 
     adapter.close = () => {
       namespaceToAdapters.delete(nsp.name);
+
+      if (namespaceToAdapters.size === 0) {
+        shouldClose = true;
+      }
 
       defaultClose.call(adapter);
     };
@@ -141,17 +137,11 @@ class RedisStreamsAdapter extends ClusterAdapter {
   override doPublish(message: ClusterMessage) {
     debug("publishing %o", message);
 
-    return this.#redisClient.xAdd(
+    return XADD(
+      this.#redisClient,
       this.#opts.streamName,
-      "*",
       RedisStreamsAdapter.encode(message),
-      {
-        TRIM: {
-          strategy: "MAXLEN",
-          strategyModifier: "~",
-          threshold: this.#opts.maxLen,
-        },
-      }
+      this.#opts.maxLen
     );
   }
 
