@@ -14,8 +14,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "compile": "tsc",
-    "format:check": "prettier --parser typescript --check lib/**/*.ts test/**/*.ts",
-    "format:fix": "prettier --parser typescript --write lib/**/*.ts test/**/*.ts",
+    "format:check": "prettier --parser typescript --check \"lib/**/*.ts\" \"test/**/*.ts\"",
+    "format:fix": "prettier --parser typescript --write \"lib/**/*.ts\" \"test/**/*.ts\"",
     "prepack": "npm run compile",
     "test": "npm run format:check && npm run compile && npm run test:redis-standalone && npm run test:redis-cluster && npm run test:ioredis-standalone && npm run test:ioredis-cluster",
     "test:redis-standalone": "nyc mocha --require ts-node/register test/**/*.ts",
