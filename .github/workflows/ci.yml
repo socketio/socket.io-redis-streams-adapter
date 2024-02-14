@@ -36,8 +36,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        env:
-          IP: '0.0.0.0'
         ports:
           - "7000-7005:7000-7005"
     steps:

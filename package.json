@@ -19,12 +19,9 @@
     "prepack": "npm run compile",
     "test": "npm run format:check && npm run compile && npm run test:redis-standalone && npm run test:redis-cluster && npm run test:ioredis-standalone && npm run test:ioredis-cluster",
     "test:redis-standalone": "nyc mocha --require ts-node/register test/**/*.ts",
-    "test:redis-cluster": "cross-env REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts",
-    "test:ioredis-standalone": "cross-env REDIS_LIB=ioredis mocha --require ts-node/register test/**/*.ts",
-    "test:ioredis-cluster": "cross-env REDIS_LIB=ioredis REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts"
-  },
-  "prettier": {
-    "endOfLine": "auto"
+    "test:redis-cluster": "REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts",
+    "test:ioredis-standalone": "REDIS_LIB=ioredis mocha --require ts-node/register test/**/*.ts",
+    "test:ioredis-cluster": "REDIS_LIB=ioredis REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts"
   },
   "dependencies": {
     "@msgpack/msgpack": "~2.8.0",
@@ -37,7 +34,6 @@
     "@types/expect.js": "^0.3.29",
     "@types/mocha": "^8.2.1",
     "@types/node": "^18.15.11",
-    "cross-env": "7.0.3",
     "expect.js": "0.3.1",
     "ioredis": "^5.3.2",
     "mocha": "^10.1.0",
