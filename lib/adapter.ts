@@ -31,6 +31,7 @@ interface ClusterAdapterOptions {
 export interface RedisStreamsAdapterOptions {
   /**
    * The name of the Redis stream.
+   * @default "socket.io"
    */
   streamName?: string;
   /**
@@ -43,6 +44,11 @@ export interface RedisStreamsAdapterOptions {
    * @default 100
    */
   readCount?: number;
+  /**
+   * The prefix of the key used to store the Socket.IO session, when the connection state recovery feature is enabled.
+   * @default "sio:session:"
+   */
+  sessionKeyPrefix?: string;
 }
 
 interface RawClusterMessage {
@@ -68,6 +74,7 @@ export function createAdapter(
       streamName: "socket.io",
       maxLen: 10_000,
       readCount: 100,
+      sessionKeyPrefix: "sio:session:",
       heartbeatInterval: 5_000,
       heartbeatTimeout: 10_000,
     },
@@ -239,9 +246,10 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
 
   override persistSession(session) {
     debug("persisting session %o", session);
+    const sessionKey = this.#opts.sessionKeyPrefix + session.pid;
     const encodedSession = Buffer.from(encode(session)).toString("base64");
 
-    this.#redisClient.set(`sio:session:${session.pid}`, encodedSession, {
+    this.#redisClient.set(sessionKey, encodedSession, {
       PX: this.nsp.server.opts.connectionStateRecovery.maxDisconnectionDuration,
     });
   }
@@ -256,7 +264,7 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
       return Promise.reject("invalid offset");
     }
 
-    const sessionKey = `sio:session:${pid}`;
+    const sessionKey = this.#opts.sessionKeyPrefix + pid;
 
     const [rawSession, offsetExists] = await this.#redisClient
       .multi()

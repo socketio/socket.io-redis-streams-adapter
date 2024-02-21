@@ -56,13 +56,14 @@ io.listen(3000);
 
 ## Options
 
-| Name                | Description                                                        | Default value |
-|---------------------|--------------------------------------------------------------------|---------------|
-| `streamName`        | The name of the Redis stream.                                      | `socket.io`   |
-| `maxLen`            | The maximum size of the stream. Almost exact trimming (~) is used. | `10_000`      |
-| `readCount`         | The number of elements to fetch per XREAD call.                    | `100`         |
-| `heartbeatInterval` | The number of ms between two heartbeats.                           | `5_000`       |
-| `heartbeatTimeout`  | The number of ms without heartbeat before we consider a node down. | `10_000`      |
+| Name                | Description                                                                                                       | Default value  |
+|---------------------|-------------------------------------------------------------------------------------------------------------------|----------------|
+| `streamName`        | The name of the Redis stream.                                                                                     | `socket.io`    |
+| `maxLen`            | The maximum size of the stream. Almost exact trimming (~) is used.                                                | `10_000`       |
+| `readCount`         | The number of elements to fetch per XREAD call.                                                                   | `100`          |
+| `sessionKeyPrefix`  | The prefix of the key used to store the Socket.IO session, when the connection state recovery feature is enabled. | `sio:session:` |
+| `heartbeatInterval` | The number of ms between two heartbeats.                                                                          | `5_000`        |
+| `heartbeatTimeout`  | The number of ms without heartbeat before we consider a node down.                                                | `10_000`       |
 
 ## How it works
 
