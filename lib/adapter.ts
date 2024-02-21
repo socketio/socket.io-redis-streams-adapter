@@ -1,11 +1,12 @@
-import type { PrivateSessionId, Session } from "socket.io-adapter";
-import { decode, encode } from "@msgpack/msgpack";
 import {
-  ClusterAdapter,
-  ClusterAdapterOptions,
-  ClusterMessage,
-  MessageType,
-} from "./cluster-adapter";
+  ClusterAdapterWithHeartbeat,
+  type ClusterMessage,
+  type PrivateSessionId,
+  type Session,
+  type ServerId,
+  type ClusterResponse,
+} from "socket.io-adapter";
+import { decode, encode } from "@msgpack/msgpack";
 import debugModule from "debug";
 import { hasBinary, XADD, XREAD } from "./util";
 
@@ -13,7 +14,21 @@ const debug = debugModule("socket.io-redis-streams-adapter");
 
 const RESTORE_SESSION_MAX_XRANGE_CALLS = 100;
 
-export interface RedisStreamsAdapterOptions extends ClusterAdapterOptions {
+// TODO ClusterAdapterOptions should be exported by the socket.io-adapter package
+interface ClusterAdapterOptions {
+  /**
+   * The number of ms between two heartbeats.
+   * @default 5_000
+   */
+  heartbeatInterval?: number;
+  /**
+   * The number of ms without heartbeat before we consider a node down.
+   * @default 10_000
+   */
+  heartbeatTimeout?: number;
+}
+
+export interface RedisStreamsAdapterOptions {
   /**
    * The name of the Redis stream.
    */
@@ -45,7 +60,7 @@ interface RawClusterMessage {
  */
 export function createAdapter(
   redisClient: any,
-  opts?: RedisStreamsAdapterOptions
+  opts?: RedisStreamsAdapterOptions & ClusterAdapterOptions
 ) {
   const namespaceToAdapters = new Map<string, RedisStreamsAdapter>();
   const options = Object.assign(
@@ -122,16 +137,20 @@ export function createAdapter(
   };
 }
 
-class RedisStreamsAdapter extends ClusterAdapter {
+class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
   readonly #redisClient: any;
   readonly #opts: Required<RedisStreamsAdapterOptions>;
 
-  constructor(nsp, redisClient, opts: Required<RedisStreamsAdapterOptions>) {
+  constructor(
+    nsp,
+    redisClient,
+    opts: Required<RedisStreamsAdapterOptions> & ClusterAdapterOptions
+  ) {
     super(nsp, opts);
     this.#redisClient = redisClient;
     this.#opts = opts;
 
-    this.initHeartbeat();
+    this.init();
   }
 
   override doPublish(message: ClusterMessage) {
@@ -145,6 +164,14 @@ class RedisStreamsAdapter extends ClusterAdapter {
     );
   }
 
+  protected doPublishResponse(
+    requesterUid: ServerId,
+    response: ClusterResponse
+  ): Promise<void> {
+    // @ts-ignore
+    return this.doPublish(response);
+  }
+
   static encode(message: ClusterMessage): RawClusterMessage {
     const rawMessage: RawClusterMessage = {
       uid: message.uid,
@@ -152,18 +179,23 @@ class RedisStreamsAdapter extends ClusterAdapter {
       type: message.type.toString(),
     };
 
+    // @ts-ignore
     if (message.data) {
+      // TODO MessageType should be exported by the socket.io-adapter package
       const mayContainBinary = [
-        MessageType.BROADCAST,
-        MessageType.BROADCAST_ACK,
-        MessageType.FETCH_SOCKETS_RESPONSE,
-        MessageType.SERVER_SIDE_EMIT,
-        MessageType.SERVER_SIDE_EMIT_RESPONSE,
+        3, // MessageType.BROADCAST,
+        8, // MessageType.FETCH_SOCKETS_RESPONSE,
+        9, // MessageType.SERVER_SIDE_EMIT,
+        10, // MessageType.SERVER_SIDE_EMIT_RESPONSE,
+        12, // MessageType.BROADCAST_ACK,
       ].includes(message.type);
 
+      // @ts-ignore
       if (mayContainBinary && hasBinary(message.data)) {
+        // @ts-ignore
         rawMessage.data = Buffer.from(encode(message.data)).toString("base64");
       } else {
+        // @ts-ignore
         rawMessage.data = JSON.stringify(message.data);
       }
     }
@@ -191,8 +223,10 @@ class RedisStreamsAdapter extends ClusterAdapter {
 
     if (rawMessage.data) {
       if (rawMessage.data.startsWith("{")) {
+        // @ts-ignore
         message.data = JSON.parse(rawMessage.data);
       } else {
+        // @ts-ignore
         message.data = decode(Buffer.from(rawMessage.data, "base64")) as Record<
           string,
           unknown
@@ -261,6 +295,7 @@ class RedisStreamsAdapter extends ClusterAdapter {
         if (entry.message.nsp === this.nsp.name && entry.message.type === "3") {
           const message = RedisStreamsAdapter.decode(entry.message);
 
+          // @ts-ignore
           if (shouldIncludePacket(session.rooms, message.data.opts)) {
             // @ts-ignore
             session.missedPackets.push(message.data.packet.data);

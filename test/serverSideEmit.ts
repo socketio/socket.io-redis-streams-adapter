@@ -61,9 +61,7 @@ describe("serverSideEmit()", function () {
     this.timeout(6000);
 
     servers[0].serverSideEmit("hello", (err: Error, response: any) => {
-      expect(err.message).to.be(
-        "timeout reached: only 1 responses received out of 2"
-      );
+      expect(err.message).to.be("timeout reached: missing 1 responses");
       expect(response).to.be.an(Array);
       expect(response).to.contain(2);
       done();
@@ -79,6 +77,27 @@ describe("serverSideEmit()", function () {
 
     servers[2].on("hello", () => {
       // do nothing
+    });
+  });
+
+  it("succeeds even if an instance leaves the cluster", (done) => {
+    servers[0].on("hello", () => {
+      done(new Error("should not happen"));
+    });
+
+    servers[1].on("hello", (cb) => {
+      cb(2);
+    });
+
+    servers[2].on("hello", (cb) => {
+      servers[2].of("/").adapter.close();
+    });
+
+    servers[0].serverSideEmit("hello", (err: Error, response: any) => {
+      expect(err).to.be(null);
+      expect(response).to.be.an(Array);
+      expect(response).to.contain(2);
+      done();
     });
   });
 });
