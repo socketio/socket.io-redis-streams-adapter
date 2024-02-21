@@ -26,6 +26,10 @@ Related packages:
 
 - [Installation](#installation)
 - [Usage](#usage)
+  - [With the `redis` package](#with-the-redis-package)
+  - [With the `redis` package and a Redis cluster](#with-the-redis-package-and-a-redis-cluster)
+  - [With the `ioredis` package](#with-the-ioredis-package)
+  - [With the `ioredis` package and a Redis cluster](#with-the-ioredis-package-and-a-redis-cluster)
 - [Options](#options)
 - [How it works](#how-it-works)
 - [License](#license)
@@ -38,6 +42,8 @@ npm install @socket.io/redis-streams-adapter redis
 
 ## Usage
 
+### With the `redis` package
+
 ```js
 import { createClient } from "redis";
 import { Server } from "socket.io";
@@ -46,6 +52,81 @@ import { createAdapter } from "@socket.io/redis-streams-adapter";
 const redisClient = createClient({ url: "redis://localhost:6379" });
 
 await redisClient.connect();
+
+const io = new Server({
+  adapter: createAdapter(redisClient)
+});
+
+io.listen(3000);
+```
+
+### With the `redis` package and a Redis cluster
+
+```js
+import { createCluster } from "redis";
+import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-streams-adapter";
+
+const redisClient = createCluster({
+  rootNodes: [
+    {
+      url: "redis://localhost:7000",
+    },
+    {
+      url: "redis://localhost:7001",
+    },
+    {
+      url: "redis://localhost:7002",
+    },
+  ],
+});
+
+await redisClient.connect();
+
+const io = new Server({
+  adapter: createAdapter(redisClient)
+});
+
+io.listen(3000);
+```
+
+### With the `ioredis` package
+
+```js
+import { Redis } from "ioredis";
+import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-streams-adapter";
+
+const redisClient = new Redis();
+
+const io = new Server({
+  adapter: createAdapter(redisClient)
+});
+
+io.listen(3000);
+```
+
+### With the `ioredis` package and a Redis cluster
+
+```js
+import { Cluster } from "ioredis";
+import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-streams-adapter";
+
+const redisClient = new Cluster([
+  {
+    host: "localhost",
+    port: 7000,
+  },
+  {
+    host: "localhost",
+    port: 7001,
+  },
+  {
+    host: "localhost",
+    port: 7002,
+  },
+]);
 
 const io = new Server({
   adapter: createAdapter(redisClient)
