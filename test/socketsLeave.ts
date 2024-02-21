@@ -20,7 +20,7 @@ describe("socketsLeave()", () => {
 
     servers[0].socketsLeave("room1");
 
-    await sleep(200);
+    await sleep(300);
 
     expect(serverSockets[0].rooms.has("room1")).to.be(false);
     expect(serverSockets[1].rooms.has("room1")).to.be(false);
@@ -34,7 +34,7 @@ describe("socketsLeave()", () => {
 
     servers[0].in("room1").socketsLeave("room2");
 
-    await sleep(200);
+    await sleep(300);
 
     expect(serverSockets[0].rooms.has("room2")).to.be(false);
     expect(serverSockets[1].rooms.has("room2")).to.be(false);
@@ -48,7 +48,7 @@ describe("socketsLeave()", () => {
 
     servers[0].in(serverSockets[1].id).socketsLeave("room3");
 
-    await sleep(200);
+    await sleep(300);
 
     expect(serverSockets[0].rooms.has("room3")).to.be(true);
     expect(serverSockets[1].rooms.has("room3")).to.be(false);

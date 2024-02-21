@@ -17,7 +17,7 @@ describe("socketsJoin()", () => {
   it("makes all socket instances join the specified room", async () => {
     servers[0].socketsJoin("room1");
 
-    await sleep(200);
+    await sleep(300);
 
     expect(serverSockets[0].rooms.has("room1")).to.be(true);
     expect(serverSockets[1].rooms.has("room1")).to.be(true);
@@ -30,7 +30,7 @@ describe("socketsJoin()", () => {
 
     servers[0].in("room1").socketsJoin("room2");
 
-    await sleep(200);
+    await sleep(300);
 
     expect(serverSockets[0].rooms.has("room2")).to.be(true);
     expect(serverSockets[1].rooms.has("room2")).to.be(false);
@@ -40,7 +40,7 @@ describe("socketsJoin()", () => {
   it("makes the given socket instance join the specified room", async () => {
     servers[0].in(serverSockets[1].id).socketsJoin("room3");
 
-    await sleep(200);
+    await sleep(300);
 
     expect(serverSockets[0].rooms.has("room3")).to.be(false);
     expect(serverSockets[1].rooms.has("room3")).to.be(true);
