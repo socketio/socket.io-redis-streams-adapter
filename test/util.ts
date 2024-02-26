@@ -1,4 +1,4 @@
-import { Server } from "socket.io";
+import { Server, ServerOptions } from "socket.io";
 import { Socket as ServerSocket } from "socket.io/dist/socket";
 import { io as ioc, Socket as ClientSocket } from "socket.io-client";
 import { createClient, createCluster } from "redis";
@@ -30,6 +30,7 @@ interface TestContext {
   serverSockets: ServerSocket[];
   clientSockets: ClientSocket[];
   cleanup: () => void;
+  ports: number[];
 }
 
 const mode = process.env.REDIS_CLUSTER === "1" ? "cluster" : "standalone";
@@ -99,7 +100,6 @@ async function initRedisClient() {
       return new Redis();
     } else {
       const redisClient = createClient();
-
       await redisClient.connect();
 
       return redisClient;
@@ -107,19 +107,28 @@ async function initRedisClient() {
   }
 }
 
-export function setup() {
+type SetupOptions = {
+  nodeCount?: number;
+  serverOptions?: Partial<ServerOptions>;
+};
+export function setup({
+  nodeCount = NODES_COUNT,
+  serverOptions = {},
+}: SetupOptions = {}) {
   const servers = [];
   const serverSockets = [];
   const clientSockets = [];
   const redisClients = [];
+  const ports = [];
 
   return new Promise<TestContext>(async (resolve) => {
-    for (let i = 1; i <= NODES_COUNT; i++) {
+    for (let i = 1; i <= nodeCount; i++) {
       const redisClient = await initRedisClient();
 
       const httpServer = createServer();
       const io = new Server(httpServer, {
         adapter: createAdapter(redisClient),
+        ...serverOptions,
       });
       httpServer.listen(() => {
         const port = (httpServer.address() as AddressInfo).port;
@@ -130,13 +139,15 @@ export function setup() {
           serverSockets.push(socket);
           servers.push(io);
           redisClients.push(redisClient);
-          if (servers.length === NODES_COUNT) {
+          ports.push(port);
+          if (servers.length === nodeCount) {
             await sleep(200);
 
             resolve({
               servers,
               serverSockets,
               clientSockets,
+              ports,
               cleanup: () => {
                 servers.forEach((server) => {
                   // @ts-ignore
