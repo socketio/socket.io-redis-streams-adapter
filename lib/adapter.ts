@@ -1,10 +1,11 @@
-import {
-  ClusterAdapterWithHeartbeat,
-  type ClusterMessage,
-  type PrivateSessionId,
-  type Session,
-  type ServerId,
-  type ClusterResponse,
+import { ClusterAdapterWithHeartbeat } from "socket.io-adapter";
+import type {
+  ClusterAdapterOptions,
+  ClusterMessage,
+  PrivateSessionId,
+  Session,
+  ServerId,
+  ClusterResponse,
 } from "socket.io-adapter";
 import { decode, encode } from "@msgpack/msgpack";
 import debugModule from "debug";
@@ -13,20 +14,6 @@ import { hasBinary, XADD, XREAD } from "./util";
 const debug = debugModule("socket.io-redis-streams-adapter");
 
 const RESTORE_SESSION_MAX_XRANGE_CALLS = 100;
-
-// TODO ClusterAdapterOptions should be exported by the socket.io-adapter package
-interface ClusterAdapterOptions {
-  /**
-   * The number of ms between two heartbeats.
-   * @default 5_000
-   */
-  heartbeatInterval?: number;
-  /**
-   * The number of ms without heartbeat before we consider a node down.
-   * @default 10_000
-   */
-  heartbeatTimeout?: number;
-}
 
 export interface RedisStreamsAdapterOptions {
   /**
