@@ -1,10 +1,11 @@
-import {
-  ClusterAdapterWithHeartbeat,
-  type ClusterMessage,
-  type PrivateSessionId,
-  type Session,
-  type ServerId,
-  type ClusterResponse,
+import { ClusterAdapterWithHeartbeat, MessageType } from "socket.io-adapter";
+import type {
+  ClusterAdapterOptions,
+  ClusterMessage,
+  PrivateSessionId,
+  Session,
+  ServerId,
+  ClusterResponse,
 } from "socket.io-adapter";
 import { decode, encode } from "@msgpack/msgpack";
 import debugModule from "debug";
@@ -13,20 +14,6 @@ import { hasBinary, XADD, XREAD } from "./util";
 const debug = debugModule("socket.io-redis-streams-adapter");
 
 const RESTORE_SESSION_MAX_XRANGE_CALLS = 100;
-
-// TODO ClusterAdapterOptions should be exported by the socket.io-adapter package
-interface ClusterAdapterOptions {
-  /**
-   * The number of ms between two heartbeats.
-   * @default 5_000
-   */
-  heartbeatInterval?: number;
-  /**
-   * The number of ms without heartbeat before we consider a node down.
-   * @default 10_000
-   */
-  heartbeatTimeout?: number;
-}
 
 export interface RedisStreamsAdapterOptions {
   /**
@@ -188,13 +175,12 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
 
     // @ts-ignore
     if (message.data) {
-      // TODO MessageType should be exported by the socket.io-adapter package
       const mayContainBinary = [
-        3, // MessageType.BROADCAST,
-        8, // MessageType.FETCH_SOCKETS_RESPONSE,
-        9, // MessageType.SERVER_SIDE_EMIT,
-        10, // MessageType.SERVER_SIDE_EMIT_RESPONSE,
-        12, // MessageType.BROADCAST_ACK,
+        MessageType.BROADCAST,
+        MessageType.FETCH_SOCKETS_RESPONSE,
+        MessageType.SERVER_SIDE_EMIT,
+        MessageType.SERVER_SIDE_EMIT_RESPONSE,
+        MessageType.BROADCAST_ACK,
       ].includes(message.type);
 
       // @ts-ignore
