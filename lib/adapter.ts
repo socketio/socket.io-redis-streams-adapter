@@ -1,4 +1,4 @@
-import { ClusterAdapterWithHeartbeat } from "socket.io-adapter";
+import { ClusterAdapterWithHeartbeat, MessageType } from "socket.io-adapter";
 import type {
   ClusterAdapterOptions,
   ClusterMessage,
@@ -177,11 +177,11 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     if (message.data) {
       // TODO MessageType should be exported by the socket.io-adapter package
       const mayContainBinary = [
-        3, // MessageType.BROADCAST,
-        8, // MessageType.FETCH_SOCKETS_RESPONSE,
-        9, // MessageType.SERVER_SIDE_EMIT,
-        10, // MessageType.SERVER_SIDE_EMIT_RESPONSE,
-        12, // MessageType.BROADCAST_ACK,
+        MessageType.BROADCAST,
+        MessageType.FETCH_SOCKETS_RESPONSE,
+        MessageType.SERVER_SIDE_EMIT,
+        MessageType.SERVER_SIDE_EMIT_RESPONSE,
+        MessageType.BROADCAST_ACK,
       ].includes(message.type);
 
       // @ts-ignore
