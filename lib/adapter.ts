@@ -175,7 +175,6 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
 
     // @ts-ignore
     if (message.data) {
-      // TODO MessageType should be exported by the socket.io-adapter package
       const mayContainBinary = [
         MessageType.BROADCAST,
         MessageType.FETCH_SOCKETS_RESPONSE,
