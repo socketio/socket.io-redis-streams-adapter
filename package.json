@@ -13,7 +13,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "compile": "tsc",
+    "compile": "rimraf ./dist && tsc",
     "format:check": "prettier --parser typescript --check \"lib/**/*.ts\" \"test/**/*.ts\"",
     "format:fix": "prettier --parser typescript --write \"lib/**/*.ts\" \"test/**/*.ts\"",
     "prepack": "npm run compile",
@@ -44,6 +44,7 @@
     "nyc": "^15.1.0",
     "prettier": "^2.8.7",
     "redis": "^4.6.5",
+    "rimraf": "^5.0.5",
     "socket.io": "^4.6.1",
     "socket.io-client": "^4.6.1",
     "ts-node": "^10.9.1",
