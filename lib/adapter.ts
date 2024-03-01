@@ -252,12 +252,17 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
 
     const sessionKey = this.#opts.sessionKeyPrefix + pid;
 
-    const [rawSession, offsetExists] = await this.#redisClient
-      .multi()
-      .get(sessionKey)
-      .del(sessionKey) // GETDEL was added in Redis version 6.2
-      .xRange(this.#opts.streamName, offset, offset)
-      .exec();
+    const results = await Promise.all([
+      this.#redisClient
+        .multi()
+        .get(sessionKey)
+        .del(sessionKey) // GETDEL was added in Redis version 6.2
+        .exec(),
+      this.#redisClient.xRange(this.#opts.streamName, offset, offset),
+    ]);
+
+    const rawSession = results[0][0];
+    const offsetExists = results[1][0];
 
     if (!rawSession || !offsetExists) {
       return Promise.reject("session or offset not found");
