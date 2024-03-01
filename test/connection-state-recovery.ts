@@ -1,61 +1,28 @@
-import { createServer } from "http";
 import { Server } from "socket.io";
-import expect = require("expect.js");
 import { io as ioc } from "socket.io-client";
-import { createAdapter } from "../lib";
-import { AddressInfo } from "net";
-import { createClient } from "redis";
-import { sleep } from "./util";
-
-const NODES_COUNT = 3;
+import { setup, sleep } from "./util";
+import expect = require("expect.js");
 
 describe("connection state recovery", () => {
-  let servers: Server[], ports: number[], redisClients: any[];
+  let servers: Server[], ports: number[], cleanup;
 
   beforeEach(async () => {
-    servers = [];
-    ports = [];
-    redisClients = [];
-
-    return new Promise(async (resolve) => {
-      for (let i = 1; i <= NODES_COUNT; i++) {
-        const redisClient = createClient();
-
-        await redisClient.connect();
-
-        const httpServer = createServer();
-        const io = new Server(httpServer, {
-          adapter: createAdapter(redisClient),
-          connectionStateRecovery: {
-            maxDisconnectionDuration: 5000,
-          },
-        });
-        httpServer.listen(async () => {
-          const port = (httpServer.address() as AddressInfo).port;
-
-          ports.push(port);
-          servers.push(io);
-          redisClients.push(redisClient);
-          if (servers.length === NODES_COUNT) {
-            await sleep(200);
-
-            resolve();
-          }
-        });
-      }
+    const testContext = await setup({
+      nodeCount: 3,
+      serverOptions: {
+        connectionStateRecovery: {
+          maxDisconnectionDuration: 5000,
+        },
+      },
     });
+    servers = testContext.servers;
+    cleanup = testContext.cleanup;
+    ports = testContext.ports;
   });
 
   afterEach(() => {
-    servers.forEach((server) => {
-      // @ts-ignore
-      server.httpServer.close();
-      server.of("/").adapter.close();
-      servers[0].of("/foo").adapter.close();
-    });
-    redisClients.forEach((redisClient) => {
-      redisClient.quit();
-    });
+    servers[0].of("/foo").adapter.close();
+    cleanup();
   });
 
   it("should restore the session", (done) => {
