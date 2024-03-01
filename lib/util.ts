@@ -48,6 +48,23 @@ function isRedisV4Client(redisClient: any) {
 }
 
 /**
+ * Map the output of the XREAD/XRANGE command with the ioredis package to the format of the redis package
+ * @param result
+ */
+function mapResult(result) {
+  const id = result[0];
+  const inlineValues = result[1];
+  const message = {};
+  for (let i = 0; i < inlineValues.length; i += 2) {
+    message[inlineValues[i]] = inlineValues[i + 1];
+  }
+  return {
+    id,
+    message,
+  };
+}
+
+/**
  * @see https://redis.io/commands/xread/
  */
 export function XREAD(
@@ -81,18 +98,7 @@ export function XREAD(
         }
         return [
           {
-            messages: results[0][1].map((result) => {
-              const id = result[0];
-              const inlineValues = result[1];
-              const message = {};
-              for (let i = 0; i < inlineValues.length; i += 2) {
-                message[inlineValues[i]] = inlineValues[i + 1];
-              }
-              return {
-                id,
-                message,
-              };
-            }),
+            messages: results[0][1].map(mapResult),
           },
         ];
       });
@@ -123,5 +129,60 @@ export function XADD(
     });
 
     return redisClient.xadd.call(redisClient, args);
+  }
+}
+
+/**
+ * @see https://redis.io/commands/xrange/
+ */
+export function XRANGE(
+  redisClient: any,
+  streamName: string,
+  start: string,
+  end: string
+) {
+  if (isRedisV4Client(redisClient)) {
+    return redisClient.xRange(streamName, start, end);
+  } else {
+    return redisClient.xrange(streamName, start, end).then((res) => {
+      return res.map(mapResult);
+    });
+  }
+}
+
+/**
+ * @see https://redis.io/commands/set/
+ */
+export function SET(
+  redisClient: any,
+  key: string,
+  value: string,
+  expiryInSeconds: number
+) {
+  if (isRedisV4Client(redisClient)) {
+    return redisClient.set(key, value, {
+      PX: expiryInSeconds,
+    });
+  } else {
+    return redisClient.set(key, value, "PX", expiryInSeconds);
+  }
+}
+
+/**
+ * @see https://redis.io/commands/getdel/
+ */
+export function GETDEL(redisClient: any, key: string) {
+  if (isRedisV4Client(redisClient)) {
+    // note: GETDEL was added in Redis version 6.2
+    return redisClient.multi().get(key).del(key).exec();
+  } else {
+    return redisClient
+      .multi()
+      .get(key)
+      .del(key)
+      .exec()
+      .then((res) => {
+        return [res[0][1]];
+      });
   }
 }

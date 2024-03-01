@@ -9,7 +9,7 @@ import type {
 } from "socket.io-adapter";
 import { decode, encode } from "@msgpack/msgpack";
 import debugModule from "debug";
-import { hasBinary, XADD, XREAD } from "./util";
+import { hasBinary, GETDEL, SET, XADD, XRANGE, XREAD } from "./util";
 
 const debug = debugModule("socket.io-redis-streams-adapter");
 
@@ -235,9 +235,12 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     const sessionKey = this.#opts.sessionKeyPrefix + session.pid;
     const encodedSession = Buffer.from(encode(session)).toString("base64");
 
-    this.#redisClient.set(sessionKey, encodedSession, {
-      PX: this.nsp.server.opts.connectionStateRecovery.maxDisconnectionDuration,
-    });
+    SET(
+      this.#redisClient,
+      sessionKey,
+      encodedSession,
+      this.nsp.server.opts.connectionStateRecovery.maxDisconnectionDuration
+    );
   }
 
   override async restoreSession(
@@ -253,12 +256,8 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     const sessionKey = this.#opts.sessionKeyPrefix + pid;
 
     const results = await Promise.all([
-      this.#redisClient
-        .multi()
-        .get(sessionKey)
-        .del(sessionKey) // GETDEL was added in Redis version 6.2
-        .exec(),
-      this.#redisClient.xRange(this.#opts.streamName, offset, offset),
+      GETDEL(this.#redisClient, sessionKey),
+      XRANGE(this.#redisClient, this.#opts.streamName, offset, offset),
     ]);
 
     const rawSession = results[0][0];
@@ -277,13 +276,11 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     // FIXME we need to add an arbitrary limit here, because if entries are added faster than what we can consume, then
     // we will loop endlessly. But if we stop before reaching the end of the stream, we might lose messages.
     for (let i = 0; i < RESTORE_SESSION_MAX_XRANGE_CALLS; i++) {
-      const entries = await this.#redisClient.xRange(
+      const entries = await XRANGE(
+        this.#redisClient,
         this.#opts.streamName,
         RedisStreamsAdapter.nextOffset(offset),
-        "+",
-        {
-          COUNT: this.#opts.readCount,
-        }
+        "+"
       );
 
       if (entries.length === 0) {
