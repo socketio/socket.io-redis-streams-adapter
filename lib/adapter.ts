@@ -234,14 +234,15 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     debug("persisting session %o", session);
     const sessionKey = this.#opts.sessionKeyPrefix + session.pid;
     const encodedSession = Buffer.from(encode(session)).toString("base64");
+    const maxDisconnectionDuration = this.nsp.server.opts.connectionStateRecovery.maxDisconnectionDuration.toString();
 
     SET(
       this.#redisClient,
       sessionKey,
       encodedSession,
-      this.nsp.server.opts.connectionStateRecovery.maxDisconnectionDuration
+      maxDisconnectionDuration
     );
-  }
+}
 
   override async restoreSession(
     pid: PrivateSessionId,
