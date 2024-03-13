@@ -2,28 +2,9 @@
 
 The `@socket.io/redis-streams-adapter` package allows broadcasting packets between multiple Socket.IO servers.
 
-Supported features:
-
-- [broadcasting](https://socket.io/docs/v4/broadcasting-events/)
-- [utility methods](https://socket.io/docs/v4/server-instance/#Utility-methods)
-  - [`socketsJoin`](https://socket.io/docs/v4/server-instance/#socketsJoin)
-  - [`socketsLeave`](https://socket.io/docs/v4/server-instance/#socketsLeave)
-  - [`disconnectSockets`](https://socket.io/docs/v4/server-instance/#disconnectSockets)
-  - [`fetchSockets`](https://socket.io/docs/v4/server-instance/#fetchSockets)
-  - [`serverSideEmit`](https://socket.io/docs/v4/server-instance/#serverSideEmit)
-- [connection state recovery](https://socket.io/docs/v4/connection-state-recovery)
-
-Related packages:
-
-- Redis adapter: https://github.com/socketio/socket.io-redis-adapter/
-- Redis emitter: https://github.com/socketio/socket.io-redis-emitter/
-- MongoDB adapter: https://github.com/socketio/socket.io-mongo-adapter/
-- MongoDB emitter: https://github.com/socketio/socket.io-mongo-emitter/
-- Postgres adapter: https://github.com/socketio/socket.io-postgres-adapter/
-- Postgres emitter: https://github.com/socketio/socket.io-postgres-emitter/
-
 **Table of contents**
 
+- [Supported features](#supported-features)
 - [Installation](#installation)
 - [Usage](#usage)
   - [With the `redis` package](#with-the-redis-package)
@@ -33,6 +14,15 @@ Related packages:
 - [Options](#options)
 - [How it works](#how-it-works)
 - [License](#license)
+
+## Supported features
+
+| Feature                         | `socket.io` version | Support                                        |
+|---------------------------------|---------------------|------------------------------------------------|
+| Socket management               | `4.0.0`             | :white_check_mark: YES (since version `0.1.0`) |
+| Inter-server communication      | `4.1.0`             | :white_check_mark: YES (since version `0.1.0`) |
+| Broadcast with acknowledgements | `4.5.0`             | :white_check_mark: YES (since version `0.1.0`) |
+| Connection state recovery       | `4.6.0`             | :white_check_mark: YES (since version `0.1.0`) |
 
 ## Installation
 
