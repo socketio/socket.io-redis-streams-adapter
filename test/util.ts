@@ -23,6 +23,10 @@ export function sleep(duration: number) {
   return new Promise((resolve) => setTimeout(resolve, duration));
 }
 
+export function shouldNotHappen(done) {
+  return () => done(new Error("should not happen"));
+}
+
 const NODES_COUNT = 3;
 
 interface TestContext {
