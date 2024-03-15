@@ -149,17 +149,9 @@ export function setup({
               clientSockets,
               ports,
               cleanup: () => {
-                servers.forEach((server) => {
-                  // @ts-ignore
-                  server.httpServer.close();
-                  server.of("/").adapter.close();
-                });
-                clientSockets.forEach((socket) => {
-                  socket.disconnect();
-                });
-                redisClients.forEach((redisClient) => {
-                  redisClient.quit();
-                });
+                servers.forEach((server) => server.close());
+                clientSockets.forEach((socket) => socket.disconnect());
+                redisClients.forEach((redisClient) => redisClient.quit());
               },
             });
           }

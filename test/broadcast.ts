@@ -35,10 +35,7 @@ describe("broadcast()", function () {
   });
 
   it("broadcasts to all clients in a namespace", (done) => {
-    const partialDone = times(3, () => {
-      servers.forEach((server) => server.of("/custom").adapter.close());
-      done();
-    });
+    const partialDone = times(3, done);
 
     servers.forEach((server) => server.of("/custom"));
 

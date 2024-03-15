@@ -21,7 +21,6 @@ describe("connection state recovery", () => {
   });
 
   afterEach(() => {
-    servers[0].of("/foo").adapter.close();
     cleanup();
   });
 
