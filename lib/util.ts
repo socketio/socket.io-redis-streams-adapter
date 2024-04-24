@@ -1,5 +1,17 @@
 import { randomBytes } from "crypto";
-import { commandOptions } from "redis";
+import {
+  type RedisClientType,
+  type RedisFunctions,
+  type RedisModules,
+  type RedisScripts,
+} from "redis";
+import { type Redis as IORedisClient } from "ioredis";
+
+export type RedisClient = RedisClientType<
+  RedisModules,
+  RedisFunctions,
+  RedisScripts
+>;
 
 export function hasBinary(obj: any, toJSON?: boolean): boolean {
   if (!obj || typeof obj !== "object") {
@@ -43,8 +55,12 @@ export function randomId() {
  *
  * @see https://github.com/redis/node-redis
  */
-function isRedisV4Client(redisClient: any) {
-  return typeof redisClient.sSubscribe === "function";
+function isRedisV4Client(
+  redisClient: RedisClient | IORedisClient
+): redisClient is RedisClient {
+  return (
+    "sSubscribe" in redisClient && typeof redisClient.sSubscribe === "function"
+  );
 }
 
 /**
@@ -68,30 +84,29 @@ function mapResult(result) {
  * @see https://redis.io/commands/xread/
  */
 export function XREAD(
-  redisClient: any,
+  redisClient: RedisClient | IORedisClient,
   streamName: string,
   offset: string,
   readCount: number
 ) {
   if (isRedisV4Client(redisClient)) {
-    return redisClient.xRead(
-      commandOptions({
-        isolated: true,
-      }),
-      [
+    return redisClient.executeIsolated((isolatedClient) =>
+      isolatedClient.xRead(
+        [
+          {
+            key: streamName,
+            id: offset,
+          },
+        ],
         {
-          key: streamName,
-          id: offset,
-        },
-      ],
-      {
-        COUNT: readCount,
-        BLOCK: 5000,
-      }
+          COUNT: readCount,
+          BLOCK: 5000,
+        }
+      )
     );
   } else {
     return redisClient
-      .xread("BLOCK", 100, "COUNT", readCount, "STREAMS", streamName, offset)
+      .xread("COUNT", readCount, "BLOCK", 100, "STREAMS", streamName, offset)
       .then((results) => {
         if (results === null) {
           return null;
@@ -109,7 +124,7 @@ export function XREAD(
  * @see https://redis.io/commands/xadd/
  */
 export function XADD(
-  redisClient: any,
+  redisClient: RedisClient | IORedisClient,
   streamName: string,
   payload: any,
   maxLenThreshold: number
@@ -136,7 +151,7 @@ export function XADD(
  * @see https://redis.io/commands/xrange/
  */
 export function XRANGE(
-  redisClient: any,
+  redisClient: RedisClient | IORedisClient,
   streamName: string,
   start: string,
   end: string
@@ -154,7 +169,7 @@ export function XRANGE(
  * @see https://redis.io/commands/set/
  */
 export function SET(
-  redisClient: any,
+  redisClient: RedisClient | IORedisClient,
   key: string,
   value: string,
   expiryInSeconds: number
@@ -171,7 +186,7 @@ export function SET(
 /**
  * @see https://redis.io/commands/getdel/
  */
-export function GETDEL(redisClient: any, key: string) {
+export function GETDEL(redisClient: RedisClient | IORedisClient, key: string) {
   if (isRedisV4Client(redisClient)) {
     // note: GETDEL was added in Redis version 6.2
     return redisClient.multi().get(key).del(key).exec();

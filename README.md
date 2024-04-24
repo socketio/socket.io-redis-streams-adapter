@@ -30,6 +30,12 @@ The `@socket.io/redis-streams-adapter` package allows broadcasting packets betwe
 npm install @socket.io/redis-streams-adapter redis
 ```
 
+or 
+
+```
+npm install @socket.io/redis-streams-adapter ioredis
+```
+
 ## Usage
 
 ### With the `redis` package

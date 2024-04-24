@@ -83,7 +83,7 @@ export function createAdapter(
       if (response) {
         for (const entry of response[0].messages) {
           debug("reading entry %s", entry.id);
-          const message = entry.message;
+          const message = entry.message as RawClusterMessage;
 
           if (message.nsp) {
             namespaceToAdapters
@@ -267,6 +267,7 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
       return Promise.reject("session or offset not found");
     }
 
+    // @ts-expect-error rawSession is expected to be a string
     const session = decode(Buffer.from(rawSession, "base64")) as Session;
 
     debug("found session %o", session);
@@ -288,8 +289,9 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
       }
 
       for (const entry of entries) {
-        if (entry.message.nsp === this.nsp.name && entry.message.type === "3") {
-          const message = RedisStreamsAdapter.decode(entry.message);
+        const rawMessage = entry.message as RawClusterMessage;
+        if (rawMessage.nsp === this.nsp.name && rawMessage.type === "3") {
+          const message = RedisStreamsAdapter.decode(rawMessage);
 
           // @ts-ignore
           if (shouldIncludePacket(session.rooms, message.data.opts)) {
