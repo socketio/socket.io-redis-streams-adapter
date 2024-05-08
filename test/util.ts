@@ -145,6 +145,11 @@ export function setup({
           redisClients.push(redisClient);
           ports.push(port);
           if (servers.length === nodeCount) {
+            // ensure all nodes know each other
+            servers[0].emit("ping");
+            servers[1].emit("ping");
+            servers[2].emit("ping");
+
             await sleep(200);
 
             resolve({

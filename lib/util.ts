@@ -1,5 +1,4 @@
 import { randomBytes } from "crypto";
-import { commandOptions } from "redis";
 
 export function hasBinary(obj: any, toJSON?: boolean): boolean {
   if (!obj || typeof obj !== "object") {
@@ -74,21 +73,23 @@ export function XREAD(
   readCount: number
 ) {
   if (isRedisV4Client(redisClient)) {
-    return redisClient.xRead(
-      commandOptions({
-        isolated: true,
-      }),
-      [
+    return import("redis").then((redisPackage) => {
+      return redisClient.xRead(
+        redisPackage.commandOptions({
+          isolated: true,
+        }),
+        [
+          {
+            key: streamName,
+            id: offset,
+          },
+        ],
         {
-          key: streamName,
-          id: offset,
-        },
-      ],
-      {
-        COUNT: readCount,
-        BLOCK: 5000,
-      }
-    );
+          COUNT: readCount,
+          BLOCK: 5000,
+        }
+      );
+    });
   } else {
     return redisClient
       .xread("BLOCK", 100, "COUNT", readCount, "STREAMS", streamName, offset)
