@@ -1,5 +1,3 @@
-import { randomBytes } from "crypto";
-
 export function hasBinary(obj: any, toJSON?: boolean): boolean {
   if (!obj || typeof obj !== "object") {
     return false;
@@ -29,10 +27,6 @@ export function hasBinary(obj: any, toJSON?: boolean): boolean {
   }
 
   return false;
-}
-
-export function randomId() {
-  return randomBytes(8).toString("hex");
 }
 
 /**
