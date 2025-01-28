@@ -38,6 +38,16 @@ jobs:
           --health-retries 5
         ports:
           - "7000-7005:7000-7005"
+      valkey:
+        image: valkey/valkey:8
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6389:6379
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

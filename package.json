@@ -17,11 +17,12 @@
     "format:check": "prettier --parser typescript --check \"lib/**/*.ts\" \"test/**/*.ts\"",
     "format:fix": "prettier --parser typescript --write \"lib/**/*.ts\" \"test/**/*.ts\"",
     "prepack": "npm run compile",
-    "test": "npm run format:check && npm run compile && npm run test:redis-standalone && npm run test:redis-cluster && npm run test:ioredis-standalone && npm run test:ioredis-cluster",
+    "test": "npm run format:check && npm run compile && npm run test:redis-standalone && npm run test:redis-cluster && npm run test:ioredis-standalone && npm run test:ioredis-cluster && npm run test:valkey-standalone",
     "test:redis-standalone": "nyc mocha --require ts-node/register test/**/*.ts",
     "test:redis-cluster": "cross-env REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts",
     "test:ioredis-standalone": "cross-env REDIS_LIB=ioredis mocha --require ts-node/register test/**/*.ts",
-    "test:ioredis-cluster": "cross-env REDIS_LIB=ioredis REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts"
+    "test:ioredis-cluster": "cross-env REDIS_LIB=ioredis REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts",
+    "test:valkey-standalone": "cross-env VALKEY=1 mocha --require ts-node/register test/**/*.ts"
   },
   "prettier": {
     "endOfLine": "auto"

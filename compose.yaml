@@ -8,3 +8,8 @@ services:
     image: grokzen/redis-cluster:7.0.10
     ports:
       - "7000-7005:7000-7005"
+
+  valkey:
+    image: valkey/valkey:8
+    ports:
+      - "6389:6379"

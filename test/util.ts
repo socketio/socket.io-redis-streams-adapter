@@ -43,8 +43,8 @@ const lib = process.env.REDIS_LIB || "redis";
 console.log(`[INFO] testing in ${mode} mode with ${lib}`);
 
 async function initRedisClient() {
-  if (process.env.REDIS_CLUSTER === "1") {
-    if (process.env.REDIS_LIB === "ioredis") {
+  if (mode === "cluster") {
+    if (lib === "ioredis") {
       return new Cluster([
         {
           host: "localhost",
@@ -100,10 +100,13 @@ async function initRedisClient() {
       return redisClient;
     }
   } else {
-    if (process.env.REDIS_LIB === "ioredis") {
+    if (lib === "ioredis") {
       return new Redis();
     } else {
-      const redisClient = createClient();
+      const port = process.env.VALKEY === "1" ? 6389 : 6379;
+      const redisClient = createClient({
+        url: `redis://localhost:${port}`,
+      });
       await redisClient.connect();
 
       return redisClient;
