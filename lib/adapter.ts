@@ -36,6 +36,13 @@ export interface RedisStreamsAdapterOptions {
    * @default "sio:session:"
    */
   sessionKeyPrefix?: string;
+  /*
+   * The block time in ms per XREAD call for non-v4 clients.  Set this to 1 for a much more
+   * realtime experience but potentially increased cpu load.  For realtime applications, the
+   * default of 100 may feel unusably laggy.
+   * @default 100
+   */
+  blockTime?: number;
 }
 
 interface RawClusterMessage {
@@ -61,6 +68,7 @@ export function createAdapter(
       streamName: "socket.io",
       maxLen: 10_000,
       readCount: 100,
+      blockTime: 100,
       sessionKeyPrefix: "sio:session:",
       heartbeatInterval: 5_000,
       heartbeatTimeout: 10_000,
@@ -77,7 +85,8 @@ export function createAdapter(
         redisClient,
         options.streamName,
         offset,
-        options.readCount
+        options.readCount,
+        options.blockCount
       );
 
       if (response) {

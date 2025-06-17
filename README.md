@@ -132,6 +132,7 @@ io.listen(3000);
 | `streamName`        | The name of the Redis stream.                                                                                     | `socket.io`    |
 | `maxLen`            | The maximum size of the stream. Almost exact trimming (~) is used.                                                | `10_000`       |
 | `readCount`         | The number of elements to fetch per XREAD call.                                                                   | `100`          |
+| `blockTime`         | The maximum time to block per XREAD call. Set to 1 for a more realtime experience but with heavier load.          | `100`          |
 | `sessionKeyPrefix`  | The prefix of the key used to store the Socket.IO session, when the connection state recovery feature is enabled. | `sio:session:` |
 | `heartbeatInterval` | The number of ms between two heartbeats.                                                                          | `5_000`        |
 | `heartbeatTimeout`  | The number of ms without heartbeat before we consider a node down.                                                | `10_000`       |
