@@ -131,7 +131,7 @@ export function createAdapter(
   };
 }
 
-class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
+export class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
   readonly #redisClient: any;
   readonly #opts: Required<RedisStreamsAdapterOptions>;
 
