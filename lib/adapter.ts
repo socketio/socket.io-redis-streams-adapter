@@ -235,12 +235,21 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     const sessionKey = this.#opts.sessionKeyPrefix + session.pid;
     const encodedSession = Buffer.from(encode(session)).toString("base64");
 
-    SET(
-      this.#redisClient,
-      sessionKey,
-      encodedSession,
-      this.nsp.server.opts.connectionStateRecovery.maxDisconnectionDuration
-    );
+    // Get the maximum disconnection duration from the server options.
+    // This value may be Infinity if the user wants sessions to never expire.
+    const maxDuration =
+      this.nsp.server.opts.connectionStateRecovery.maxDisconnectionDuration;
+
+    // Redis 'SET' command with EXPIRE requires a finite integer.
+    // If maxDuration is Infinity, Redis will throw "ERR value is not an integer or out of range".
+    // To prevent that, we clamp Infinity to the maximum allowed integer (2^31 - 1 seconds ≈ 68 years).
+    // Otherwise, we use Math.floor to ensure any finite value is an integer.
+    const expiry =
+      maxDuration === Infinity ? 2 ** 31 - 1 : Math.floor(maxDuration);
+
+    // Persist the session in Redis with the calculated expiry.
+    // 'SET key value EX <seconds>' will now always have a valid integer expiry.
+    SET(this.#redisClient, sessionKey, encodedSession, expiry);
   }
 
   override async restoreSession(
