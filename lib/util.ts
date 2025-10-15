@@ -82,6 +82,10 @@ export function XREAD(
   if (isRedisV5Client(redisClient)) {
     if (!redisClient[POOL]) {
       redisClient[POOL] = redisClient.createPool();
+
+      redisClient.on("end", () => {
+        redisClient[POOL].destroy();
+      });
     }
 
     return redisClient[POOL].xRead(
