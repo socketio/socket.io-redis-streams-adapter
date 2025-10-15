@@ -30,17 +30,25 @@ export function hasBinary(obj: any, toJSON?: boolean): boolean {
 }
 
 /**
- * Whether the client comes from the `redis` package
+ * Whether the client comes from version 5.x of the `redis` package
  *
  * @param redisClient
  *
- * @see https://github.com/redis/node-redis
+ * @see https://github.com/redis/node-redis/blob/master/docs/v5.md
+ */
+function isRedisV5Client(redisClient: any) {
+  return typeof redisClient.createPool === "function";
+}
+
+/**
+ * Whether the client comes from version 4.x of the `redis` package
+ *
+ * @param redisClient
+ *
+ * @see https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md
  */
 function isRedisV4Client(redisClient: any) {
-  return (
-    typeof redisClient.sSubscribe === "function" ||
-    typeof redisClient.totalClients === "number"
-  );
+  return typeof redisClient.sSubscribe === "function";
 }
 
 /**
@@ -60,6 +68,8 @@ function mapResult(result) {
   };
 }
 
+const POOL = Symbol("redis_v5_pool");
+
 /**
  * @see https://redis.io/commands/xread/
  */
@@ -69,29 +79,40 @@ export function XREAD(
   offset: string,
   readCount: number
 ) {
-  if (isRedisV4Client(redisClient)) {
-    return import("redis").then((redisPackage) => {
-      const streams = [
+  if (isRedisV5Client(redisClient)) {
+    if (!redisClient[POOL]) {
+      redisClient[POOL] = redisClient.createPool();
+    }
+
+    return redisClient[POOL].xRead(
+      [
         {
           key: streamName,
           id: offset,
         },
-      ];
-      const options = {
+      ],
+      {
         COUNT: readCount,
         BLOCK: 5000,
-      };
-      if (redisPackage.commandOptions) {
-        return redisClient.xRead(
-          redisPackage.commandOptions({
-            isolated: true,
-          }),
-          streams,
-          options
-        );
-      } else {
-        return redisClient.xRead(streams, options);
       }
+    );
+  } else if (isRedisV4Client(redisClient)) {
+    return import("redis").then((redisPackage) => {
+      return redisClient.xRead(
+        redisPackage.commandOptions({
+          isolated: true,
+        }),
+        [
+          {
+            key: streamName,
+            id: offset,
+          },
+        ],
+        {
+          COUNT: readCount,
+          BLOCK: 5000,
+        }
+      );
     });
   } else {
     return redisClient
@@ -118,7 +139,7 @@ export function XADD(
   payload: any,
   maxLenThreshold: number
 ) {
-  if (isRedisV4Client(redisClient)) {
+  if (isRedisV4Client(redisClient) || isRedisV5Client(redisClient)) {
     return redisClient.xAdd(streamName, "*", payload, {
       TRIM: {
         strategy: "MAXLEN",
@@ -145,7 +166,7 @@ export function XRANGE(
   start: string,
   end: string
 ) {
-  if (isRedisV4Client(redisClient)) {
+  if (isRedisV4Client(redisClient) || isRedisV5Client(redisClient)) {
     return redisClient.xRange(streamName, start, end);
   } else {
     return redisClient.xrange(streamName, start, end).then((res) => {
@@ -163,7 +184,7 @@ export function SET(
   value: string,
   expiryInSeconds: number
 ) {
-  if (isRedisV4Client(redisClient)) {
+  if (isRedisV4Client(redisClient) || isRedisV5Client(redisClient)) {
     return redisClient.set(key, value, {
       PX: expiryInSeconds,
     });
@@ -176,7 +197,7 @@ export function SET(
  * @see https://redis.io/commands/getdel/
  */
 export function GETDEL(redisClient: any, key: string) {
-  if (isRedisV4Client(redisClient)) {
+  if (isRedisV4Client(redisClient) || isRedisV5Client(redisClient)) {
     // note: GETDEL was added in Redis version 6.2
     return redisClient.multi().get(key).del(key).exec();
   } else {

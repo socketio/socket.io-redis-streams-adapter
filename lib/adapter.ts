@@ -55,10 +55,6 @@ export function createAdapter(
   redisClient: any,
   opts?: RedisStreamsAdapterOptions & ClusterAdapterOptions
 ) {
-  const internalRedisClient =
-    typeof redisClient.createPool === "function"
-      ? redisClient.createPool()
-      : redisClient;
   const namespaceToAdapters = new Map<string, RedisStreamsAdapter>();
   const options = Object.assign(
     {
@@ -78,7 +74,7 @@ export function createAdapter(
   async function poll() {
     try {
       let response = await XREAD(
-        internalRedisClient,
+        redisClient,
         options.streamName,
         offset,
         options.readCount
@@ -110,7 +106,7 @@ export function createAdapter(
   }
 
   return function (nsp) {
-    const adapter = new RedisStreamsAdapter(nsp, internalRedisClient, options);
+    const adapter = new RedisStreamsAdapter(nsp, redisClient, options);
     namespaceToAdapters.set(nsp.name, adapter);
 
     if (!polling) {

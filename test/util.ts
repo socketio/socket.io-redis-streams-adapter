@@ -1,7 +1,10 @@
-import { Server, ServerOptions } from "socket.io";
-import { Socket as ServerSocket } from "socket.io/dist/socket";
+import { Server, ServerOptions, Socket as ServerSocket } from "socket.io";
 import { io as ioc, Socket as ClientSocket } from "socket.io-client";
 import { createClient, createCluster } from "redis";
+import {
+  createClient as createClientV5,
+  createCluster as createClusterV5,
+} from "redis-v5";
 import { Redis, Cluster } from "ioredis";
 import { createServer } from "http";
 import { createAdapter } from "../lib";
@@ -43,73 +46,114 @@ const lib = process.env.REDIS_LIB || "redis";
 console.log(`[INFO] testing in ${mode} mode with ${lib}`);
 
 async function initRedisClient() {
-  if (mode === "cluster") {
-    if (lib === "ioredis") {
-      return new Cluster([
-        {
-          host: "localhost",
-          port: 7000,
-        },
-        {
-          host: "localhost",
-          port: 7001,
-        },
-        {
-          host: "localhost",
-          port: 7002,
-        },
-        {
-          host: "localhost",
-          port: 7003,
-        },
-        {
-          host: "localhost",
-          port: 7004,
-        },
-        {
-          host: "localhost",
-          port: 7005,
-        },
-      ]);
-    } else {
-      const redisClient = createCluster({
-        rootNodes: [
+  switch (lib) {
+    case "ioredis": {
+      if (mode === "cluster") {
+        return new Cluster([
           {
-            url: "redis://localhost:7000",
+            host: "localhost",
+            port: 7000,
           },
           {
-            url: "redis://localhost:7001",
+            host: "localhost",
+            port: 7001,
           },
           {
-            url: "redis://localhost:7002",
+            host: "localhost",
+            port: 7002,
           },
           {
-            url: "redis://localhost:7003",
+            host: "localhost",
+            port: 7003,
           },
           {
-            url: "redis://localhost:7004",
+            host: "localhost",
+            port: 7004,
           },
           {
-            url: "redis://localhost:7005",
+            host: "localhost",
+            port: 7005,
           },
-        ],
-      });
-
-      await redisClient.connect();
-
-      return redisClient;
+        ]);
+      } else {
+        return new Redis();
+      }
     }
-  } else {
-    if (lib === "ioredis") {
-      return new Redis();
-    } else {
-      const port = process.env.VALKEY === "1" ? 6389 : 6379;
-      const redisClient = createClient({
-        url: `redis://localhost:${port}`,
-      });
-      await redisClient.connect();
+    case "redis-v5": {
+      if (mode === "cluster") {
+        const redisClient = createClusterV5({
+          rootNodes: [
+            {
+              url: "redis://localhost:7000",
+            },
+            {
+              url: "redis://localhost:7001",
+            },
+            {
+              url: "redis://localhost:7002",
+            },
+            {
+              url: "redis://localhost:7003",
+            },
+            {
+              url: "redis://localhost:7004",
+            },
+            {
+              url: "redis://localhost:7005",
+            },
+          ],
+        });
 
-      return redisClient;
+        await redisClient.connect();
+
+        return redisClient;
+      } else {
+        const redisClient = createClientV5({
+          url: "redis://localhost:6379",
+        });
+        await redisClient.connect();
+
+        return redisClient;
+      }
+    }
+    case "redis":
+    default: {
+      if (mode === "cluster") {
+        const redisClient = createCluster({
+          rootNodes: [
+            {
+              url: "redis://localhost:7000",
+            },
+            {
+              url: "redis://localhost:7001",
+            },
+            {
+              url: "redis://localhost:7002",
+            },
+            {
+              url: "redis://localhost:7003",
+            },
+            {
+              url: "redis://localhost:7004",
+            },
+            {
+              url: "redis://localhost:7005",
+            },
+          ],
+        });
+
+        await redisClient.connect();
+
+        return redisClient;
+      } else {
+        const port = process.env.VALKEY === "1" ? 6389 : 6379;
+        const redisClient = createClient({
+          url: `redis://localhost:${port}`,
+        });
+        await redisClient.connect();
+
+        return redisClient;
+      }
     }
   }
 }
