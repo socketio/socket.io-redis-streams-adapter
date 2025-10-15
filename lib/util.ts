@@ -88,7 +88,15 @@ export function XREAD(
     });
   } else {
     return redisClient
-      .xread("BLOCK", BLOCK_DURATION_IN_MS, "COUNT", readCount, "STREAMS", streamName, offset)
+      .xread(
+        "BLOCK",
+        BLOCK_DURATION_IN_MS,
+        "COUNT",
+        readCount,
+        "STREAMS",
+        streamName,
+        offset
+      )
       .then((results) => {
         if (results === null) {
           return null;
