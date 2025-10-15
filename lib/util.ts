@@ -57,8 +57,6 @@ function mapResult(result) {
   };
 }
 
-const POOL = Symbol("redis-v5-pool");
-
 /**
  * @see https://redis.io/commands/xread/
  */
@@ -70,28 +68,6 @@ export function XREAD(
   blockTimeInMs: number
 ) {
   if (isNodeRedisClient(redisClient)) {
-    if (typeof redisClient.createPool === "function") {
-      if (!redisClient[POOL]) {
-        redisClient[POOL] = redisClient.createPool();
-
-        redisClient.on("end", () => {
-          redisClient[POOL].destroy();
-        });
-      }
-
-      return redisClient[POOL].xRead(
-        [
-          {
-            key: streamName,
-            id: offset,
-          },
-        ],
-        {
-          COUNT: readCount,
-          BLOCK: blockTimeInMs,
-        }
-      );
-    }
     return redisClient.xRead(
       [
         {
