@@ -14,9 +14,9 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         node-version:
-          - 14
           - 20
 
     services:
