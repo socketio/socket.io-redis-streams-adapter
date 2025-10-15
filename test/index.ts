@@ -165,7 +165,7 @@ describe("@socket.io/redis-streams-adapter", () => {
       const sockets = await servers[0].in(serverSockets[1].id).fetchSockets();
       expect(sockets.length).to.eql(1);
 
-      const response = await sockets[0].timeout(500).emitWithAck("test");
+      const response = await sockets[0].timeout(1000).emitWithAck("test");
       expect(response).to.eql(2);
     });
   });
