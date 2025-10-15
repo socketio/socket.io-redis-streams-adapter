@@ -57,6 +57,7 @@ function mapResult(result) {
   };
 }
 
+// https://redis.io/docs/latest/commands/xread/#blocking-for-data
 const BLOCK_DURATION_IN_MS = 200;
 
 /**
@@ -69,23 +70,18 @@ export function XREAD(
   readCount: number
 ) {
   if (isNodeRedisClient(redisClient)) {
-    return import("redis").then((redisPackage) => {
-      return redisClient.xRead(
-        redisPackage.commandOptions({
-          isolated: true,
-        }),
-        [
-          {
-            key: streamName,
-            id: offset,
-          },
-        ],
+    return redisClient.xRead(
+      [
         {
-          COUNT: readCount,
-          BLOCK: BLOCK_DURATION_IN_MS,
-        }
-      );
-    });
+          key: streamName,
+          id: offset,
+        },
+      ],
+      {
+        COUNT: readCount,
+        BLOCK: BLOCK_DURATION_IN_MS,
+      }
+    );
   } else {
     return redisClient
       .xread(
