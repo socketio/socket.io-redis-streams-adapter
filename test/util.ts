@@ -178,7 +178,9 @@ export function setup({
 
       const httpServer = createServer();
       const io = new Server(httpServer, {
-        adapter: createAdapter(redisClient),
+        adapter: createAdapter(redisClient, {
+          readCount: 1, // return as soon as possible
+        }),
         ...serverOptions,
       });
       httpServer.listen(() => {

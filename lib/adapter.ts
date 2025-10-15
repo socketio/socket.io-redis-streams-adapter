@@ -32,6 +32,12 @@ export interface RedisStreamsAdapterOptions {
    */
   readCount?: number;
   /**
+   * The number of ms before timing out.
+   * @default 200
+   * @see https://redis.io/docs/latest/commands/xread/#blocking-for-data
+   */
+  blockTimeInMs?: number;
+  /**
    * The prefix of the key used to store the Socket.IO session, when the connection state recovery feature is enabled.
    * @default "sio:session:"
    */
@@ -61,6 +67,7 @@ export function createAdapter(
       streamName: "socket.io",
       maxLen: 10_000,
       readCount: 100,
+      blockTimeInMs: 200,
       sessionKeyPrefix: "sio:session:",
       heartbeatInterval: 5_000,
       heartbeatTimeout: 10_000,
@@ -77,7 +84,8 @@ export function createAdapter(
         redisClient,
         options.streamName,
         offset,
-        options.readCount
+        options.readCount,
+        options.blockTimeInMs
       );
 
       if (response) {
