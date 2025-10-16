@@ -33,7 +33,7 @@ export interface RedisStreamsAdapterOptions {
   readCount?: number;
   /**
    * The number of ms before timing out.
-   * @default 200
+   * @default 1_000
    * @see https://redis.io/docs/latest/commands/xread/#blocking-for-data
    */
   blockTimeInMs?: number;
@@ -67,7 +67,7 @@ export function createAdapter(
       streamName: "socket.io",
       maxLen: 10_000,
       readCount: 100,
-      blockTimeInMs: 200,
+      blockTimeInMs: 1_000,
       sessionKeyPrefix: "sio:session:",
       heartbeatInterval: 5_000,
       heartbeatTimeout: 10_000,
@@ -78,10 +78,13 @@ export function createAdapter(
   let polling = false;
   let shouldClose = false;
 
+  // we create a Redis client dedicated to polling the stream so that it does not interfere with XADD operations
+  const pollClient = redisClient.duplicate();
+
   async function poll() {
     try {
       let response = await XREAD(
-        redisClient,
+        pollClient,
         options.streamName,
         offset,
         options.readCount,
@@ -120,7 +123,11 @@ export function createAdapter(
     if (!polling) {
       polling = true;
       shouldClose = false;
-      poll();
+      if (typeof pollClient.connect === "function") {
+        pollClient.connect().then(poll);
+      } else {
+        poll();
+      }
     }
 
     const defaultClose = adapter.close;
@@ -130,6 +137,7 @@ export function createAdapter(
 
       if (namespaceToAdapters.size === 0) {
         shouldClose = true;
+        pollClient.quit();
       }
 
       defaultClose.call(adapter);

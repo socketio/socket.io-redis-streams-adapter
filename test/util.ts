@@ -179,7 +179,7 @@ export function setup({
       const httpServer = createServer();
       const io = new Server(httpServer, {
         adapter: createAdapter(redisClient, {
-          blockTimeInMs: 20, // reduce the polling interval to speed up the tests
+          readCount: 1, // return as soon as possible
         }),
         ...serverOptions,
       });
