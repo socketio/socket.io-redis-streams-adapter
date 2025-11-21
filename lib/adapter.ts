@@ -293,8 +293,10 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
 
           // @ts-ignore
           if (shouldIncludePacket(session.rooms, message.data.opts)) {
+            const packetData = message.data.packet.data.slice();
+            packetData.push(entry.id);
             // @ts-ignore
-            session.missedPackets.push(message.data.packet.data);
+            session.missedPackets.push(packetData);
           }
         }
         offset = entry.id;
