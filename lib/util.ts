@@ -37,7 +37,10 @@ export function hasBinary(obj: any, toJSON?: boolean): boolean {
  * @see https://github.com/redis/node-redis
  */
 function isRedisV4Client(redisClient: any) {
-  return typeof redisClient.sSubscribe === "function";
+  return (
+    typeof redisClient.sSubscribe === "function" ||
+    typeof redisClient.totalClients === "number"
+  );
 }
 
 /**
@@ -68,21 +71,27 @@ export function XREAD(
 ) {
   if (isRedisV4Client(redisClient)) {
     return import("redis").then((redisPackage) => {
-      return redisClient.xRead(
-        redisPackage.commandOptions({
-          isolated: true,
-        }),
-        [
-          {
-            key: streamName,
-            id: offset,
-          },
-        ],
+      const streams = [
         {
-          COUNT: readCount,
-          BLOCK: 5000,
-        }
-      );
+          key: streamName,
+          id: offset,
+        },
+      ];
+      const options = {
+        COUNT: readCount,
+        BLOCK: 5000,
+      };
+      if (redisPackage.commandOptions) {
+        return redisClient.xRead(
+          redisPackage.commandOptions({
+            isolated: true,
+          }),
+          streams,
+          options
+        );
+      } else {
+        return redisClient.xRead(streams, options);
+      }
     });
   } else {
     return redisClient
