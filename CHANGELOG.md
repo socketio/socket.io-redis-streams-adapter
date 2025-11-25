@@ -1,13 +1,22 @@
-# History
+# Changelog
 
 | Version                  | Date          |
 |--------------------------|---------------|
+| [0.2.3](#023-2025-11-25) | November 2025 |
 | [0.2.2](#022-2024-05-08) | May 2024      |
 | [0.2.1](#021-2024-03-11) | March 2024    |
 | [0.2.0](#020-2024-02-21) | February 2024 |
 | [0.1.0](#010-2023-04-06) | April 2023    |
 
-# Release notes
+
+## [0.2.3](https://github.com/socketio/socket.io-redis-streams-adapter/compare/0.2.2...0.2.3) (2025-11-25)
+
+
+### Bug Fixes
+
+* **CSR:** include the offset in the restored packets ([#40](https://github.com/socketio/socket.io-redis-streams-adapter/issues/40)) ([c260f17](https://github.com/socketio/socket.io-redis-streams-adapter/commit/c260f1790276f7454944524117e1645506eace54))
+
+
 
 ## [0.2.2](https://github.com/socketio/socket.io-redis-streams-adapter/compare/0.2.1...0.2.2) (2024-05-08)
 
