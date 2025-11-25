@@ -289,12 +289,14 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
 
       for (const entry of entries) {
         if (entry.message.nsp === this.nsp.name && entry.message.type === "3") {
-          const message = RedisStreamsAdapter.decode(entry.message);
+          const message = RedisStreamsAdapter.decode(entry.message) as {
+            data: any;
+          };
+          const { packet, opts } = message.data;
 
-          // @ts-ignore
-          if (shouldIncludePacket(session.rooms, message.data.opts)) {
-            // @ts-ignore
-            session.missedPackets.push(message.data.packet.data);
+          if (shouldIncludePacket(session.rooms, opts)) {
+            packet.data.push(entry.id);
+            session.missedPackets.push(packet.data);
           }
         }
         offset = entry.id;

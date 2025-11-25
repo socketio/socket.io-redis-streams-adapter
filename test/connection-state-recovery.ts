@@ -1,10 +1,10 @@
 import { Server } from "socket.io";
 import { io as ioc } from "socket.io-client";
-import { setup, sleep } from "./util";
+import { setup } from "./util";
 import expect = require("expect.js");
 
 describe("connection state recovery", () => {
-  let servers: Server[], ports: number[], cleanup;
+  let servers: Server[], ports: number[], cleanup: () => void;
 
   beforeEach(async () => {
     const testContext = await setup({
@@ -82,10 +82,14 @@ describe("connection state recovery", () => {
       socket.io.engine.close();
 
       socket.on("connect", () => {
+        // @ts-expect-error _lastOffset is private
+        offsets.add(socket._lastOffset);
+
         expect(socket.recovered).to.eql(true);
 
         setTimeout(() => {
           expect(events).to.eql([1, 2, 3]);
+          expect(offsets.size).to.eql(4);
 
           socket.disconnect();
           done();
@@ -94,9 +98,13 @@ describe("connection state recovery", () => {
     });
 
     const events: number[] = [];
+    const offsets = new Set<string>();
 
     socket.on("myEvent", (val) => {
       events.push(val);
+      // note: the offset is updated after the callback execution
+      // @ts-expect-error _lastOffset is private
+      offsets.add(socket._lastOffset);
     });
   });
 
