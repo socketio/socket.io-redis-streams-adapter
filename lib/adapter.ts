@@ -27,7 +27,7 @@ import {
 
 const debug = debugModule("socket.io-redis-streams-adapter");
 
-const RESTORE_SESSION_MAX_XRANGE_CALLS = 100;
+const RESTORE_SESSION_EXTRA_XRANGE_CALLS = 100;
 
 export interface RedisStreamsAdapterOptions {
   /**
@@ -64,7 +64,8 @@ export interface RedisStreamsAdapterOptions {
    */
   maxLen?: number;
   /**
-   * The number of elements to fetch per XREAD call.
+   * The number of elements to fetch per XREAD call (polling) and per XRANGE
+   * call (session recovery).
    * @default 100
    */
   readCount?: number;
@@ -196,6 +197,14 @@ export function createAdapter(
     },
     opts
   );
+
+  if (!Number.isInteger(options.readCount) || options.readCount <= 0) {
+    throw new Error("readCount must be a positive integer");
+  }
+
+  if (!Number.isInteger(options.maxLen) || options.maxLen <= 0) {
+    throw new Error("maxLen must be a positive integer");
+  }
 
   function onMessage(message: RawClusterMessage, offset: string) {
     namespaceToAdapters.get(message.nsp)?.onRawMessage(message, offset);
@@ -464,14 +473,19 @@ class RedisStreamsAdapter extends ClusterAdapter {
 
     session.missedPackets = [];
 
-    // FIXME we need to add an arbitrary limit here, because if entries are added faster than what we can consume, then
-    // we will loop endlessly. But if we stop before reaching the end of the stream, we might lose messages.
-    for (let i = 0; i < RESTORE_SESSION_MAX_XRANGE_CALLS; i++) {
+    // Limit iterations to prevent infinite loops when entries are added faster
+    // than we can consume, while keeping the previous 100-call headroom.
+    const maxXrangeCalls =
+      Math.ceil(this.#opts.maxLen / this.#opts.readCount) +
+      RESTORE_SESSION_EXTRA_XRANGE_CALLS;
+
+    for (let i = 0; i < maxXrangeCalls; i++) {
       const entries = await XRANGE(
         this.#redisClient,
         this.#streamName,
         RedisStreamsAdapter.nextOffset(offset),
-        "+"
+        "+",
+        this.#opts.readCount
       );
 
       if (entries.length === 0) {

@@ -137,7 +137,7 @@ io.listen(3000);
 | `channelPrefix`     | The prefix of the Redis PUB/SUB channels used to communicate between the nodes.                                       | `socket.io`    |
 | `useShardedPubSub`  | Whether to use sharded PUB/SUB (added in Redis 7.0) to communicate between the nodes.                                 | `false`        |
 | `maxLen`            | The maximum size of the stream. Almost exact trimming (~) is used.                                                    | `10_000`       |
-| `readCount`         | The number of elements to fetch per XREAD call.                                                                       | `100`          |
+| `readCount`         | The number of elements to fetch per XREAD call (polling) and per XRANGE call (session recovery).                      | `100`          |
 | `blockTimeInMs`     | The number of ms before the XREAD call times out.                                                                     | `5_000`        |
 | `sessionKeyPrefix`  | The prefix of the key used to store the Socket.IO session, when the connection state recovery feature is enabled.     | `sio:session:` |
 | `onlyPlaintext`     | Whether the transmitted data contains only JSON-serializable objects without binary data (Buffer, ArrayBuffer, etc.). | `false`        |
