@@ -57,6 +57,12 @@ export interface RedisStreamsAdapterOptions {
    * @default "sio:session:"
    */
   sessionKeyPrefix?: string;
+  /**
+   * Whether the transmitted data contains only JSON-serializable objects without binary data (Buffer, ArrayBuffer, etc.).
+   * When enabled, binary data checks are skipped for better performance.
+   * @default false
+   */
+  onlyPlaintext?: boolean;
 }
 
 interface RawClusterMessage {
@@ -160,6 +166,7 @@ export function createAdapter(
       sessionKeyPrefix: "sio:session:",
       heartbeatInterval: 5_000,
       heartbeatTimeout: 10_000,
+      onlyPlaintext: false,
     },
     opts
   );
@@ -239,7 +246,7 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     return XADD(
       this.#redisClient,
       this.#streamName,
-      RedisStreamsAdapter.encode(message),
+      this.encode(message),
       this.#opts.maxLen
     );
   }
@@ -252,7 +259,7 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     return this.doPublish(response);
   }
 
-  static encode(message: ClusterMessage): RawClusterMessage {
+  private encode(message: ClusterMessage): RawClusterMessage {
     const rawMessage: RawClusterMessage = {
       uid: message.uid,
       nsp: message.nsp,
@@ -269,8 +276,12 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
         MessageType.BROADCAST_ACK,
       ].includes(message.type);
 
-      // @ts-ignore
-      if (mayContainBinary && hasBinary(message.data)) {
+      if (
+        !this.#opts.onlyPlaintext &&
+        mayContainBinary &&
+        // @ts-ignore
+        hasBinary(message.data)
+      ) {
         // @ts-ignore
         rawMessage.data = Buffer.from(encode(message.data)).toString("base64");
       } else {
