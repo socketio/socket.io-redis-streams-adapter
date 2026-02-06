@@ -9,7 +9,16 @@ import type {
 } from "socket.io-adapter";
 import { decode, encode } from "@msgpack/msgpack";
 import debugModule from "debug";
-import { hasBinary, GETDEL, SET, XADD, XRANGE, XREAD } from "./util";
+import {
+  hasBinary,
+  GETDEL,
+  SET,
+  XADD,
+  XRANGE,
+  XREAD,
+  hashCode,
+  duplicateClient,
+} from "./util";
 
 const debug = debugModule("socket.io-redis-streams-adapter");
 
@@ -17,10 +26,22 @@ const RESTORE_SESSION_MAX_XRANGE_CALLS = 100;
 
 export interface RedisStreamsAdapterOptions {
   /**
-   * The name of the Redis stream.
+   * The name of the Redis stream (or the prefix used when using multiple streams).
+   *
+   * @see streamCount
    * @default "socket.io"
    */
   streamName?: string;
+  /**
+   * The number of streams to use to scale horizontally.
+   *
+   * Each namespace is routed to a specific stream to ensure the ordering of messages.
+   *
+   * Note: using multiple streams is useless when using a single namespace.
+   *
+   * @default 1
+   */
+  streamCount?: number;
   /**
    * The maximum size of the stream. Almost exact trimming (~) is used.
    * @default 10_000
@@ -45,6 +66,80 @@ interface RawClusterMessage {
   data?: string;
 }
 
+interface ReadOnlyClient {
+  client: any;
+  streamName: string;
+}
+
+async function createReadOnlyClients(
+  redisClient: any,
+  opts: RedisStreamsAdapterOptions
+): Promise<ReadOnlyClient[]> {
+  if (opts.streamCount === 1) {
+    const newClient = await duplicateClient(redisClient);
+    return [
+      {
+        client: newClient,
+        streamName: opts.streamName,
+      },
+    ];
+  } else {
+    const streamNames = [];
+    for (let i = 0; i < opts.streamCount; i++) {
+      const newClient = await duplicateClient(redisClient);
+      streamNames.push({
+        client: newClient,
+        streamName: opts.streamName + "-" + i,
+      });
+    }
+    return streamNames;
+  }
+}
+
+function startPolling(
+  redisClient: any,
+  streamName: string,
+  options: RedisStreamsAdapterOptions,
+  onMessage: (message: RawClusterMessage, offset: string) => void,
+  signal: AbortSignal
+) {
+  let offset = "$";
+
+  async function poll() {
+    try {
+      let response = await XREAD(
+        redisClient,
+        streamName,
+        offset,
+        options.readCount
+      );
+
+      if (response) {
+        for (const entry of response[0].messages) {
+          debug("reading entry %s", entry.id);
+          const message = entry.message;
+
+          if (message.nsp) {
+            onMessage(message, entry.id);
+          }
+
+          offset = entry.id;
+        }
+      }
+    } catch (e) {
+      debug("something went wrong while consuming the stream: %s", e.message);
+    }
+
+    if (signal.aborted) {
+      redisClient.disconnect();
+    } else {
+      poll();
+    }
+  }
+
+  poll();
+}
+
 /**
  * Returns a function that will create a new adapter instance.
  *
@@ -59,6 +154,7 @@ export function createAdapter(
   const options = Object.assign(
     {
       streamName: "socket.io",
+      streamCount: 1,
       maxLen: 10_000,
       readCount: 100,
       sessionKeyPrefix: "sio:session:",
@@ -67,53 +163,28 @@ export function createAdapter(
     },
     opts
   );
-  let offset = "$";
-  let polling = false;
-  let shouldClose = false;
 
-  async function poll() {
-    try {
-      let response = await XREAD(
-        redisClient,
-        options.streamName,
-        offset,
-        options.readCount
-      );
-
-      if (response) {
-        for (const entry of response[0].messages) {
-          debug("reading entry %s", entry.id);
-          const message = entry.message;
-
-          if (message.nsp) {
-            namespaceToAdapters
-              .get(message.nsp)
-              ?.onRawMessage(message, entry.id);
-          }
-
-          offset = entry.id;
-        }
-      }
-    } catch (e) {
-      debug("something went wrong while consuming the stream: %s", e.message);
-    }
-
-    if (namespaceToAdapters.size > 0 && !shouldClose) {
-      poll();
-    } else {
-      polling = false;
-    }
+  function onMessage(message: RawClusterMessage, offset: string) {
+    namespaceToAdapters.get(message.nsp)?.onRawMessage(message, offset);
   }
+
+  let readOnlyClients: ReadOnlyClient[];
+  const controller = new AbortController();
+
+  // note: we create one Redis client per stream so they don't block each other. We could also have used one Redis
+  // client per master in the cluster (reading from the streams assigned to the given node), but that would have been
+  // trickier to implement.
+  createReadOnlyClients(redisClient, options).then((clients) => {
+    readOnlyClients = clients;
+
+    for (const { client, streamName } of readOnlyClients) {
+      startPolling(client, streamName, options, onMessage, controller.signal);
+    }
+  });
 
   return function (nsp) {
     const adapter = new RedisStreamsAdapter(nsp, redisClient, options);
     namespaceToAdapters.set(nsp.name, adapter);
-
-    if (!polling) {
-      polling = true;
-      shouldClose = false;
-      poll();
-    }
 
     const defaultClose = adapter.close;
 
@@ -121,7 +192,7 @@ export function createAdapter(
       namespaceToAdapters.delete(nsp.name);
 
       if (namespaceToAdapters.size === 0) {
-        shouldClose = true;
+        controller.abort();
       }
 
       defaultClose.call(adapter);
@@ -131,9 +202,22 @@ export function createAdapter(
   };
 }
 
+function computeStreamName(
+  namespaceName: string,
+  opts: RedisStreamsAdapterOptions
+) {
+  if (opts.streamCount === 1) {
+    return opts.streamName;
+  } else {
+    const i = hashCode(namespaceName) % opts.streamCount;
+    return opts.streamName + "-" + i;
+  }
+}
+
 class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
   readonly #redisClient: any;
   readonly #opts: Required<RedisStreamsAdapterOptions>;
+  readonly #streamName: string;
 
   constructor(
     nsp,
@@ -143,6 +227,8 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     super(nsp, opts);
     this.#redisClient = redisClient;
     this.#opts = opts;
+    // each namespace is routed to a specific stream to ensure the ordering of messages
+    this.#streamName = computeStreamName(nsp.name, opts);
 
     this.init();
   }
@@ -152,7 +238,7 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
 
     return XADD(
       this.#redisClient,
-      this.#opts.streamName,
+      this.#streamName,
       RedisStreamsAdapter.encode(message),
       this.#opts.maxLen
     );
@@ -257,7 +343,7 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
 
     const results = await Promise.all([
       GETDEL(this.#redisClient, sessionKey),
-      XRANGE(this.#redisClient, this.#opts.streamName, offset, offset),
+      XRANGE(this.#redisClient, this.#streamName, offset, offset),
     ]);
 
     const rawSession = results[0][0];
@@ -278,7 +364,7 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     for (let i = 0; i < RESTORE_SESSION_MAX_XRANGE_CALLS; i++) {
       const entries = await XRANGE(
         this.#redisClient,
-        this.#opts.streamName,
+        this.#streamName,
         RedisStreamsAdapter.nextOffset(offset),
         "+"
       );

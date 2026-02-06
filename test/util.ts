@@ -2,7 +2,7 @@ import { Server, ServerOptions } from "socket.io";
 import { Socket as ServerSocket } from "socket.io/dist/socket";
 import { io as ioc, Socket as ClientSocket } from "socket.io-client";
 import { createServer } from "http";
-import { createAdapter } from "../lib";
+import { createAdapter, RedisStreamsAdapterOptions } from "../lib";
 import { AddressInfo } from "net";
 
 export function times(count: number, fn: () => void) {
@@ -37,7 +37,8 @@ interface TestContext {
 
 export function setup(
   initRedisClient: () => any,
-  serverOptions: Partial<ServerOptions> = {}
+  serverOptions: Partial<ServerOptions> = {},
+  adapterOptions: RedisStreamsAdapterOptions = {}
 ): Promise<TestContext> {
   const servers = [];
   const serverSockets = [];
@@ -51,7 +52,10 @@ export function setup(
 
       const httpServer = createServer();
       const io = new Server(httpServer, {
-        adapter: createAdapter(redisClient),
+        adapter: createAdapter(redisClient, {
+          readCount: 1, // return as soon as possible
+          ...adapterOptions,
+        }),
         ...serverOptions,
       });
       httpServer.listen(() => {
@@ -64,28 +68,39 @@ export function setup(
           servers.push(io);
           redisClients.push(redisClient);
           ports.push(port);
-          if (servers.length === NODES_COUNT) {
-            // ensure all nodes know each other
-            servers[0].emit("ping");
-            servers[1].emit("ping");
-            servers[2].emit("ping");
-
-            await sleep(200);
-
-            resolve({
-              servers,
-              serverSockets,
-              clientSockets,
-              ports,
-              cleanup: () => {
-                servers.forEach((server) => server.close());
-                clientSockets.forEach((socket) => socket.disconnect());
-                redisClients.forEach((redisClient) => redisClient.quit());
-              },
-            });
-          }
         });
       });
     }
+
+    function isReady() {
+      return (
+        servers.length === NODES_COUNT &&
+        clientSockets.length === NODES_COUNT &&
+        servers.every((server) => {
+          const serverCount = server.of("/").adapter.nodesMap.size;
+          return serverCount === NODES_COUNT - 1;
+        })
+      );
+    }
+
+    while (!isReady()) {
+      if (servers.length > 0) {
+        // notify other servers in the cluster
+        servers[0]?.of("/").adapter.init();
+      }
+      await sleep(100);
+    }
+
+    resolve({
+      servers,
+      serverSockets,
+      clientSockets,
+      ports,
+      cleanup: () => {
+        servers.forEach((server) => server.close());
+        clientSockets.forEach((socket) => socket.disconnect());
+        redisClients.forEach((redisClient) => redisClient.quit());
+      },
+    });
   });
 }

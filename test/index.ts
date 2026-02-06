@@ -2,8 +2,12 @@ import { Server, Socket as ServerSocket } from "socket.io";
 import { Socket as ClientSocket } from "socket.io-client";
 import expect = require("expect.js");
 import { times, sleep, setup, shouldNotHappen } from "./util";
+import { RedisStreamsAdapterOptions } from "../lib";
 
-export function testSuite(initRedisClient: () => any) {
+export function testSuite(
+  initRedisClient: () => any,
+  adapterOptions: RedisStreamsAdapterOptions = {}
+) {
   describe("common", () => {
     let servers: Server[];
     let serverSockets: ServerSocket[];
@@ -11,7 +15,7 @@ export function testSuite(initRedisClient: () => any) {
     let cleanup: () => void;
 
     beforeEach(async () => {
-      const testContext = await setup(initRedisClient);
+      const testContext = await setup(initRedisClient, {}, adapterOptions);
       servers = testContext.servers;
       serverSockets = testContext.serverSockets;
       clientSockets = testContext.clientSockets;

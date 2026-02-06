@@ -2,11 +2,36 @@ import { testSuite } from "./index";
 import { createClient, createCluster } from "redis";
 import { Cluster, Redis } from "ioredis";
 import { csrTestSuite } from "./connection-state-recovery";
+import { RedisStreamsAdapterOptions } from "../lib";
 
-function testSuites(initRedisClient: () => any) {
-  testSuite(initRedisClient);
-  csrTestSuite(initRedisClient);
+function testSuites(
+  initRedisClient: () => any,
+  adapterOptions: RedisStreamsAdapterOptions = {}
+) {
+  testSuite(initRedisClient, adapterOptions);
+  csrTestSuite(initRedisClient, adapterOptions);
 }
+
+const CLUSTER_ROOT_NODES = [
+  {
+    url: "redis://localhost:7000",
+  },
+  {
+    url: "redis://localhost:7001",
+  },
+  {
+    url: "redis://localhost:7002",
+  },
+  {
+    url: "redis://localhost:7003",
+  },
+  {
+    url: "redis://localhost:7004",
+  },
+  {
+    url: "redis://localhost:7005",
+  },
+];
 
 describe("@socket.io/redis-streams-adapter", () => {
   describe("redis with single Redis node", () => {
@@ -20,32 +45,30 @@ describe("@socket.io/redis-streams-adapter", () => {
   describe("redis with Redis cluster", () => {
     testSuites(async () => {
       const redisClient = createCluster({
-        rootNodes: [
-          {
-            url: "redis://localhost:7000",
-          },
-          {
-            url: "redis://localhost:7001",
-          },
-          {
-            url: "redis://localhost:7002",
-          },
-          {
-            url: "redis://localhost:7003",
-          },
-          {
-            url: "redis://localhost:7004",
-          },
-          {
-            url: "redis://localhost:7005",
-          },
-        ],
+        rootNodes: CLUSTER_ROOT_NODES,
       });
 
       await redisClient.connect();
 
       return redisClient;
     });
+  });
+
+  describe("redis with Redis cluster and multiple streams", () => {
+    testSuites(
+      async () => {
+        const redisClient = createCluster({
+          rootNodes: CLUSTER_ROOT_NODES,
+        });
+
+        await redisClient.connect();
+
+        return redisClient;
+      },
+      {
+        streamCount: 5,
+      }
+    );
   });
 
   describe("ioredis with single Redis node", () => {

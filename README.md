@@ -130,6 +130,7 @@ io.listen(3000);
 | Name                | Description                                                                                                       | Default value  |
 |---------------------|-------------------------------------------------------------------------------------------------------------------|----------------|
 | `streamName`        | The name of the Redis stream.                                                                                     | `socket.io`    |
+| `streamCount`       | The number of streams to use to scale horizontally.                                                               | `1`            |
 | `maxLen`            | The maximum size of the stream. Almost exact trimming (~) is used.                                                | `10_000`       |
 | `readCount`         | The number of elements to fetch per XREAD call.                                                                   | `100`          |
 | `sessionKeyPrefix`  | The prefix of the key used to store the Socket.IO session, when the connection state recovery feature is enabled. | `sio:session:` |

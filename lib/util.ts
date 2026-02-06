@@ -40,6 +40,14 @@ function isRedisV4Client(redisClient: any) {
   return typeof redisClient.sSubscribe === "function";
 }
 
+export async function duplicateClient(redisClient: any) {
+  const newClient = redisClient.duplicate();
+  if (isRedisV4Client(redisClient)) {
+    await newClient.connect();
+  }
+  return newClient;
+}
+
 /**
  * Map the output of the XREAD/XRANGE command with the ioredis package to the format of the redis package
  * @param result
@@ -67,26 +75,21 @@ export function XREAD(
   readCount: number
 ) {
   if (isRedisV4Client(redisClient)) {
-    return import("redis").then((redisPackage) => {
-      return redisClient.xRead(
-        redisPackage.commandOptions({
-          isolated: true,
-        }),
-        [
-          {
-            key: streamName,
-            id: offset,
-          },
-        ],
+    return redisClient.xRead(
+      [
         {
-          COUNT: readCount,
-          BLOCK: 5000,
-        }
-      );
-    });
+          key: streamName,
+          id: offset,
+        },
+      ],
+      {
+        COUNT: readCount,
+        BLOCK: 5000,
+      }
+    );
   } else {
     return redisClient
-      .xread("BLOCK", 100, "COUNT", readCount, "STREAMS", streamName, offset)
+      .xread("BLOCK", 5000, "COUNT", readCount, "STREAMS", streamName, offset)
       .then((results) => {
         if (results === null) {
           return null;
@@ -180,4 +183,14 @@ export function GETDEL(redisClient: any, key: string) {
         return [res[0][1]];
       });
   }
+}
+
+export function hashCode(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    let chr = str.charCodeAt(i);
+    hash = hash * 31 + chr;
+    hash |= 0;
+  }
+  return hash;
 }

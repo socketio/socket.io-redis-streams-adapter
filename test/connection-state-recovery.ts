@@ -2,19 +2,27 @@ import { Server } from "socket.io";
 import { io as ioc } from "socket.io-client";
 import { setup } from "./util";
 import expect = require("expect.js");
+import { RedisStreamsAdapterOptions } from "../lib";
 
-export function csrTestSuite(initRedisClient: () => any) {
+export function csrTestSuite(
+  initRedisClient: () => any,
+  adapterOptions: RedisStreamsAdapterOptions = {}
+) {
   describe("connection state recovery", () => {
     let servers: Server[];
     let ports: number[];
     let cleanup: () => void;
 
     beforeEach(async () => {
-      const testContext = await setup(initRedisClient, {
-        connectionStateRecovery: {
-          maxDisconnectionDuration: 5000,
+      const testContext = await setup(
+        initRedisClient,
+        {
+          connectionStateRecovery: {
+            maxDisconnectionDuration: 5000,
+          },
         },
-      });
+        adapterOptions
+      );
       servers = testContext.servers;
       cleanup = testContext.cleanup;
       ports = testContext.ports;
