@@ -72,7 +72,8 @@ export function XREAD(
   redisClient: any,
   streamName: string,
   offset: string,
-  readCount: number
+  readCount: number,
+  blockTimeInMs: number
 ) {
   if (isRedisV4Client(redisClient)) {
     return redisClient.xRead(
@@ -84,12 +85,20 @@ export function XREAD(
       ],
       {
         COUNT: readCount,
-        BLOCK: 5000,
+        BLOCK: blockTimeInMs,
       }
     );
   } else {
     return redisClient
-      .xread("BLOCK", 5000, "COUNT", readCount, "STREAMS", streamName, offset)
+      .xread(
+        "BLOCK",
+        blockTimeInMs,
+        "COUNT",
+        readCount,
+        "STREAMS",
+        streamName,
+        offset
+      )
       .then((results) => {
         if (results === null) {
           return null;

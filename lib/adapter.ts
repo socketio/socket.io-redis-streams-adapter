@@ -53,6 +53,12 @@ export interface RedisStreamsAdapterOptions {
    */
   readCount?: number;
   /**
+   * The number of ms before the XREAD call times out.
+   * @default 200
+   * @see https://redis.io/docs/latest/commands/xread/#blocking-for-data
+   */
+  blockTimeInMs?: number;
+  /**
    * The prefix of the key used to store the Socket.IO session, when the connection state recovery feature is enabled.
    * @default "sio:session:"
    */
@@ -117,7 +123,8 @@ function startPolling(
         redisClient,
         streamName,
         offset,
-        options.readCount
+        options.readCount,
+        options.blockTimeInMs
       );
 
       if (response) {
@@ -163,6 +170,7 @@ export function createAdapter(
       streamCount: 1,
       maxLen: 10_000,
       readCount: 100,
+      blockTimeInMs: 5_000,
       sessionKeyPrefix: "sio:session:",
       heartbeatInterval: 5_000,
       heartbeatTimeout: 10_000,
