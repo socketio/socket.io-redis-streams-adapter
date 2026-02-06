@@ -18,11 +18,12 @@
     "format:fix": "prettier --parser typescript --write \"lib/**/*.ts\" \"test/**/*.ts\"",
     "prepack": "npm run compile",
     "test": "npm run format:check && npm run compile && npm run test:redis-standalone && npm run test:redis-cluster && npm run test:ioredis-standalone && npm run test:ioredis-cluster && npm run test:valkey-standalone",
-    "test:redis-standalone": "nyc mocha --require ts-node/register test/**/*.ts",
-    "test:redis-cluster": "cross-env REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts",
-    "test:ioredis-standalone": "cross-env REDIS_LIB=ioredis mocha --require ts-node/register test/**/*.ts",
-    "test:ioredis-cluster": "cross-env REDIS_LIB=ioredis REDIS_CLUSTER=1 mocha --require ts-node/register test/**/*.ts",
-    "test:valkey-standalone": "cross-env VALKEY=1 mocha --require ts-node/register test/**/*.ts"
+    "test:redis-standalone": "nyc mocha --import=tsx test/**/*.ts",
+    "test:redis-cluster": "cross-env REDIS_CLUSTER=1 mocha --import=tsx test/**/*.ts",
+    "test:redis-cluster-multiplex": "cross-env REDIS_CLUSTER=1 mocha --import=tsx test/**/*.ts",
+    "test:ioredis-standalone": "cross-env REDIS_LIB=ioredis mocha --import=tsx test/**/*.ts",
+    "test:ioredis-cluster": "cross-env REDIS_LIB=ioredis REDIS_CLUSTER=1 mocha --import=tsx test/**/*.ts",
+    "test:valkey-standalone": "cross-env VALKEY=1 mocha --import=tsx test/**/*.ts"
   },
   "prettier": {
     "endOfLine": "auto"
@@ -48,7 +49,7 @@
     "rimraf": "^5.0.5",
     "socket.io": "^4.6.1",
     "socket.io-client": "^4.6.1",
-    "ts-node": "^10.9.1",
+    "tsx": "~4.21.0",
     "typescript": "^4.9.5"
   },
   "engines": {
