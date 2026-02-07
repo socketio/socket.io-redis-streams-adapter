@@ -131,6 +131,8 @@ io.listen(3000);
 |---------------------|-----------------------------------------------------------------------------------------------------------------------|----------------|
 | `streamName`        | The name of the Redis stream.                                                                                         | `socket.io`    |
 | `streamCount`       | The number of streams to use to scale horizontally.                                                                   | `1`            |
+| `channelPrefix`     | The prefix of the Redis PUB/SUB channels used to communicate between the nodes.                                       | `socket.io`    |
+| `useShardedPubSub`  | Whether to use sharded PUB/SUB (added in Redis 7.0) to communicate between the nodes.                                 | `false`        |
 | `maxLen`            | The maximum size of the stream. Almost exact trimming (~) is used.                                                    | `10_000`       |
 | `readCount`         | The number of elements to fetch per XREAD call.                                                                       | `100`          |
 | `blockTimeInMs`     | The number of ms before the XREAD call times out.                                                                     | `5_000`        |

@@ -71,6 +71,23 @@ describe("@socket.io/redis-streams-adapter", () => {
     );
   });
 
+  describe("redis with Redis cluster and sharded PUB/SUB", () => {
+    testSuites(
+      async () => {
+        const redisClient = createCluster({
+          rootNodes: CLUSTER_ROOT_NODES,
+        });
+
+        await redisClient.connect();
+
+        return redisClient;
+      },
+      {
+        useShardedPubSub: true,
+      }
+    );
+  });
+
   describe("ioredis with single Redis node", () => {
     testSuites(() => {
       return new Redis();

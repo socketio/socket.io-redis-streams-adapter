@@ -1,4 +1,4 @@
-import { ClusterAdapterWithHeartbeat, MessageType } from "socket.io-adapter";
+import { ClusterAdapter, MessageType } from "socket.io-adapter";
 import type {
   ClusterAdapterOptions,
   ClusterMessage,
@@ -13,11 +13,16 @@ import {
   hasBinary,
   GETDEL,
   SET,
+  SUBSCRIBE,
   XADD,
   XRANGE,
   XREAD,
   hashCode,
   duplicateClient,
+  SPUBLISH,
+  PUBLISH,
+  PUBSUB,
+  SSUBSCRIBE,
 } from "./util";
 
 const debug = debugModule("socket.io-redis-streams-adapter");
@@ -42,6 +47,17 @@ export interface RedisStreamsAdapterOptions {
    * @default 1
    */
   streamCount?: number;
+  /**
+   * The prefix of the Redis PUB/SUB channels used to communicate between the nodes.
+   * @default "socket.io"
+   */
+  channelPrefix?: string;
+  /**
+   * Whether to use sharded PUB/SUB (added in Redis 7.0) to communicate between the nodes.
+   * @default false
+   * @see https://redis.io/docs/latest/develop/pubsub/#sharded-pubsub
+   */
+  useShardedPubSub?: boolean;
   /**
    * The maximum size of the stream. Almost exact trimming (~) is used.
    * @default 10_000
@@ -168,6 +184,8 @@ export function createAdapter(
     {
       streamName: "socket.io",
       streamCount: 1,
+      channelPrefix: "socket.io",
+      useShardedPubSub: false,
       maxLen: 10_000,
       readCount: 100,
       blockTimeInMs: 5_000,
@@ -197,8 +215,19 @@ export function createAdapter(
     }
   });
 
+  const subClientPromise = duplicateClient(redisClient);
+
+  controller.signal.addEventListener("abort", () => {
+    subClientPromise.then((subClient) => subClient.disconnect());
+  });
+
   return function (nsp) {
-    const adapter = new RedisStreamsAdapter(nsp, redisClient, options);
+    const adapter = new RedisStreamsAdapter(
+      nsp,
+      redisClient,
+      subClientPromise,
+      options
+    );
     namespaceToAdapters.set(nsp.name, adapter);
 
     const defaultClose = adapter.close;
@@ -229,27 +258,69 @@ function computeStreamName(
   }
 }
 
-class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
+function isEphemeral(message: ClusterMessage) {
+  const isBroadcastWithAck =
+    message.type === MessageType.BROADCAST &&
+    message.data.requestId !== undefined;
+
+  return (
+    isBroadcastWithAck ||
+    [MessageType.SERVER_SIDE_EMIT, MessageType.FETCH_SOCKETS].includes(
+      message.type
+    )
+  );
+}
+
+class RedisStreamsAdapter extends ClusterAdapter {
   readonly #redisClient: any;
   readonly #opts: Required<RedisStreamsAdapterOptions>;
   readonly #streamName: string;
+  readonly #publicChannel: string;
 
   constructor(
-    nsp,
-    redisClient,
+    nsp: any,
+    redisClient: any,
+    subClientPromise: Promise<any>,
     opts: Required<RedisStreamsAdapterOptions> & ClusterAdapterOptions
   ) {
-    super(nsp, opts);
+    super(nsp);
     this.#redisClient = redisClient;
     this.#opts = opts;
     // each namespace is routed to a specific stream to ensure the ordering of messages
     this.#streamName = computeStreamName(nsp.name, opts);
 
-    this.init();
+    this.#publicChannel = `${opts.channelPrefix}#${nsp.name}#`;
+    const privateChannel = `${opts.channelPrefix}#${nsp.name}#${this.uid}#`;
+
+    subClientPromise.then((subClient) => {
+      (this.#opts.useShardedPubSub ? SSUBSCRIBE : SUBSCRIBE)(
+        subClient,
+        [this.#publicChannel, privateChannel],
+        (payload: Buffer) => {
+          try {
+            const message = decode(payload) as ClusterMessage;
+            this.onMessage(message);
+          } catch (e) {
+            return debug("invalid format: %s", e.message);
+          }
+        }
+      );
+    });
   }
 
   override doPublish(message: ClusterMessage) {
     debug("publishing %o", message);
+
+    if (isEphemeral(message)) {
+      // ephemeral messages are sent with Redis PUB/SUB
+      const payload = Buffer.from(encode(message));
+      (this.#opts.useShardedPubSub ? SPUBLISH : PUBLISH)(
+        this.#redisClient,
+        this.#publicChannel,
+        payload
+      );
+      return Promise.resolve("");
+    }
 
     return XADD(
       this.#redisClient,
@@ -263,8 +334,15 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     requesterUid: ServerId,
     response: ClusterResponse
   ): Promise<void> {
-    // @ts-ignore
-    return this.doPublish(response);
+    const responseChannel = `${this.#opts.channelPrefix}#${
+      this.nsp.name
+    }#${requesterUid}#`;
+    const payload = Buffer.from(encode(response));
+    return (this.#opts.useShardedPubSub ? SPUBLISH : PUBLISH)(
+      this.#redisClient,
+      responseChannel,
+      payload
+    ).then();
   }
 
   private encode(message: ClusterMessage): RawClusterMessage {
@@ -333,6 +411,14 @@ class RedisStreamsAdapter extends ClusterAdapterWithHeartbeat {
     }
 
     return message;
+  }
+
+  override serverCount(): Promise<number> {
+    return PUBSUB(
+      this.#redisClient,
+      this.#opts.useShardedPubSub ? "SHARDNUMSUB" : "NUMSUB",
+      this.#publicChannel
+    );
   }
 
   override persistSession(session) {

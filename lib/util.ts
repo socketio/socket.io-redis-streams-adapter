@@ -42,6 +42,11 @@ function isRedisV4Client(redisClient: any) {
 
 export async function duplicateClient(redisClient: any) {
   const newClient = redisClient.duplicate();
+
+  newClient.on("error", (err) => {
+    // ignore errors
+  });
+
   if (isRedisV4Client(redisClient)) {
     await newClient.connect();
   }
@@ -202,4 +207,108 @@ export function hashCode(str: string) {
     hash |= 0;
   }
   return hash;
+}
+
+export function PUBLISH(redisClient: any, channel: string, payload: Buffer) {
+  return redisClient.publish(channel, payload);
+}
+
+export function SPUBLISH(redisClient: any, channel: string, payload: Buffer) {
+  if (isRedisV4Client(redisClient)) {
+    return redisClient.sPublish(channel, payload);
+  } else {
+    return redisClient.spublish(channel, payload);
+  }
+}
+
+const RETURN_BUFFERS = true;
+
+export function SUBSCRIBE(
+  subClient: any,
+  channels: string[],
+  listener: (payload: Buffer) => void
+) {
+  if (isRedisV4Client(subClient)) {
+    subClient.subscribe(channels, listener, RETURN_BUFFERS);
+  } else {
+    subClient.subscribe(channels);
+    subClient.on("messageBuffer", (channel: Buffer, payload: Buffer) => {
+      if (channels.includes(channel.toString())) {
+        listener(payload);
+      }
+    });
+  }
+}
+
+export function SSUBSCRIBE(
+  subClient: any,
+  channels: string[],
+  listener: (payload: Buffer) => void
+) {
+  if (isRedisV4Client(subClient)) {
+    // note: we could also have used a hash tag ({...}) to ensure the channels are mapped to the same slot
+    for (const channel of channels) {
+      subClient.sSubscribe(channel, listener, RETURN_BUFFERS);
+    }
+  } else {
+    for (const channel of channels) {
+      subClient.ssubscribe(channel);
+    }
+    subClient.on("smessageBuffer", (channel: Buffer, payload: Buffer) => {
+      if (channels.includes(channel.toString())) {
+        listener(payload);
+      }
+    });
+  }
+}
+
+function parseNumSubResponse(res: string[]) {
+  return parseInt(res[1], 10);
+}
+
+function sumValues(values) {
+  return values.reduce((acc, val) => acc + val, 0);
+}
+
+export function PUBSUB(
+  redisClient: any,
+  arg: "NUMSUB" | "SHARDNUMSUB",
+  channel: string
+) {
+  if (redisClient.constructor.name === "Cluster" || redisClient.isCluster) {
+    // ioredis cluster
+    return Promise.all(
+      redisClient.nodes().map((node) => {
+        return node
+          .send_command("PUBSUB", [arg, channel])
+          .then(parseNumSubResponse);
+      })
+    ).then(sumValues);
+  } else if (isRedisV4Client(redisClient)) {
+    const isCluster = Array.isArray(redisClient.masters);
+    if (isCluster) {
+      // redis@4 cluster
+      const nodes = redisClient.masters;
+      return Promise.all(
+        nodes.map((node) => {
+          return node.client
+            .sendCommand(["PUBSUB", arg, channel])
+            .then(parseNumSubResponse);
+        })
+      ).then(sumValues);
+    } else {
+      // redis@4 standalone
+      return redisClient
+        .sendCommand(["PUBSUB", arg, channel])
+        .then(parseNumSubResponse);
+    }
+  } else {
+    // ioredis / redis@3 standalone
+    return new Promise((resolve, reject) => {
+      redisClient.send_command("PUBSUB", [arg, channel], (err, numSub) => {
+        if (err) return reject(err);
+        resolve(parseNumSubResponse(numSub));
+      });
+    });
+  }
 }

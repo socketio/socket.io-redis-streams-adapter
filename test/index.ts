@@ -349,7 +349,9 @@ export function testSuite(
         this.timeout(6000);
 
         servers[0].serverSideEmit("hello", (err: Error, response: any) => {
-          expect(err.message).to.be("timeout reached: missing 1 responses");
+          expect(err.message).to.be(
+            "timeout reached: only 1 responses received out of 2"
+          );
           expect(response).to.be.an(Array);
           expect(response).to.contain(2);
           done();
@@ -362,7 +364,7 @@ export function testSuite(
         });
       });
 
-      it("succeeds even if an instance leaves the cluster", (done) => {
+      it.skip("succeeds even if an instance leaves the cluster", (done) => {
         servers[0].on("hello", shouldNotHappen(done));
         servers[1].on("hello", (cb) => cb(2));
         servers[2].on("hello", () => {

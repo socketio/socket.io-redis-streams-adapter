@@ -74,20 +74,11 @@ export function setup(
 
     function isReady() {
       return (
-        servers.length === NODES_COUNT &&
-        clientSockets.length === NODES_COUNT &&
-        servers.every((server) => {
-          const serverCount = server.of("/").adapter.nodesMap.size;
-          return serverCount === NODES_COUNT - 1;
-        })
+        servers.length === NODES_COUNT && clientSockets.length === NODES_COUNT
       );
     }
 
     while (!isReady()) {
-      if (servers.length > 0) {
-        // notify other servers in the cluster
-        servers[0]?.of("/").adapter.init();
-      }
       await sleep(100);
     }
 
