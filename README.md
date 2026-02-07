@@ -1,6 +1,9 @@
 # Socket.IO Redis Streams adapter
 
-The `@socket.io/redis-streams-adapter` package allows broadcasting packets between multiple Socket.IO servers.
+The `@socket.io/redis-streams-adapter` package allows broadcasting packets between multiple Socket.IO servers using:
+
+- Redis Streams: https://redis.io/docs/latest/develop/data-types/streams/
+- Redis PUB/SUB for ephemeral communications: https://redis.io/docs/latest/develop/pubsub/
 
 **Table of contents**
 
@@ -143,13 +146,13 @@ io.listen(3000);
 
 ## How it works
 
-The adapter will use a [Redis stream](https://redis.io/docs/data-types/streams/) to forward events between the Socket.IO servers.
+The adapter will use a [Redis stream](https://redis.io/docs/latest/develop/data-types/streams/) to forward events between the Socket.IO servers.
 
 Notes:
 
-- a single stream is used for all namespaces
-- the `maxLen` option allows to limit the size of the stream
-- unlike the adapter based on Redis PUB/SUB mechanism, this adapter will properly handle any temporary disconnection to the Redis server and resume the stream
+- by default, a single stream is used for all namespaces (see the `streamCount` option)
+- the `maxLen` option allows limiting the size of the stream
+- unlike the adapter based on the Redis PUB/SUB mechanism, this adapter will properly handle any temporary disconnection to the Redis server and resume the stream
 - if [connection state recovery](https://socket.io/docs/v4/connection-state-recovery) is enabled, the sessions will be stored in Redis as a classic key/value pair
 
 ## License
