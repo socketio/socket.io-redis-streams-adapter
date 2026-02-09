@@ -70,7 +70,7 @@ export interface RedisStreamsAdapterOptions {
   readCount?: number;
   /**
    * The number of ms before the XREAD call times out.
-   * @default 200
+   * @default 5_000
    * @see https://redis.io/docs/latest/commands/xread/#blocking-for-data
    */
   blockTimeInMs?: number;
