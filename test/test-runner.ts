@@ -89,8 +89,23 @@ describe("@socket.io/redis-streams-adapter", () => {
   });
 
   describe("ioredis with single Redis node", () => {
-    testSuites(() => {
-      return new Redis();
+    describe("default options", () => {
+      testSuites(() => {
+        return new Redis();
+      });
+    });
+
+    describe("with lazyConnect: true and enableOfflineQueue: false", () => {
+      testSuites(async () => {
+        const redis = new Redis({
+          lazyConnect: true,
+          enableOfflineQueue: false,
+        });
+
+        await redis.connect();
+
+        return redis;
+      });
     });
   });
 

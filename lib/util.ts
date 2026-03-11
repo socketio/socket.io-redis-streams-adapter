@@ -47,7 +47,7 @@ export async function duplicateClient(redisClient: any) {
     // ignore errors
   });
 
-  if (isRedisV4Client(redisClient)) {
+  if (isRedisV4Client(redisClient) || redisClient.options.lazyConnect) {
     await newClient.connect();
   }
   return newClient;
