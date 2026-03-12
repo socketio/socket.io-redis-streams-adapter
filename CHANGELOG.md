@@ -2,12 +2,21 @@
 
 | Version                  | Date          |
 |--------------------------|---------------|
+| [0.3.1](#031-2026-03-12) | March 2026    |
 | [0.3.0](#030-2026-02-09) | February 2026 |
 | [0.2.3](#023-2025-11-25) | November 2025 |
 | [0.2.2](#022-2024-05-08) | May 2024      |
 | [0.2.1](#021-2024-03-11) | March 2024    |
 | [0.2.0](#020-2024-02-21) | February 2024 |
 | [0.1.0](#010-2023-04-06) | April 2023    |
+
+
+## [0.3.1](https://github.com/socketio/socket.io-redis-streams-adapter/compare/0.3.0...0.3.1) (2026-03-12)
+
+
+### Bug Fixes
+
+* **ioredis:** call connect() when lazyConnect is true ([690ff22](https://github.com/socketio/socket.io-redis-streams-adapter/commits/690ff22779143c77f74156b68491b940b3cac629))
 
 
 ## [0.3.0](https://github.com/socketio/socket.io-redis-streams-adapter/compare/0.2.3...0.3.0) (2026-02-09)
