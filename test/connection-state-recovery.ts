@@ -116,6 +116,64 @@ export function csrTestSuite(
       });
     });
 
+    it("should also replay socketsJoin() and socketsLeave() requests", (done) => {
+      const socket = ioc(`http://localhost:${ports[0]}`, {
+        reconnectionDelay: 20,
+      });
+
+      servers[0].once("connection", (socket) => {
+        socket.on("disconnect", () => {
+          servers[0].socketsJoin(["room1", "room2"]);
+          servers[0].in("room1").socketsLeave("room2");
+        });
+
+        servers[0].once("connection", (socket) => {
+          expect(socket.recovered).to.eql(true);
+          expect(socket.rooms.has("room1")).to.eql(true);
+          expect(socket.rooms.has("room2")).to.eql(false);
+
+          socket.disconnect();
+          done();
+        });
+      });
+
+      socket.once("connect", () => {
+        servers[1].emit("init");
+      });
+
+      socket.on("init", () => {
+        // under the hood, the client saves the offset of this packet, so now we force the reconnection
+        socket.io.engine.close();
+      });
+    });
+
+    it("should not restore a manually disconnected session", (done) => {
+      const socket = ioc(`http://localhost:${ports[0]}`, {
+        reconnectionDelay: 20,
+      });
+
+      servers[0].once("connection", (socket) => {
+        socket.on("disconnect", () => {
+          servers[0].in(socket.id).disconnectSockets();
+        });
+      });
+
+      socket.once("connect", () => {
+        servers[1].emit("init");
+      });
+
+      socket.on("init", () => {
+        // under the hood, the client saves the offset of this packet, so now we force the reconnection
+        socket.io.engine.close();
+
+        socket.on("connect", () => {
+          expect(socket.recovered).to.eql(false);
+          socket.disconnect();
+          done();
+        });
+      });
+    });
+
     it("should fail to restore an unknown session (invalid session ID)", (done) => {
       const socket = ioc(`http://localhost:${ports[0]}`, {
         reconnectionDelay: 20,

@@ -1,4 +1,4 @@
-import { ClusterAdapter, MessageType } from "socket.io-adapter";
+import { BroadcastFlags, ClusterAdapter, MessageType } from "socket.io-adapter";
 import type {
   ClusterAdapterOptions,
   ClusterMessage,
@@ -15,7 +15,6 @@ import {
   SET,
   SUBSCRIBE,
   XADD,
-  XRANGE,
   XREAD,
   hashCode,
   duplicateClient,
@@ -26,8 +25,6 @@ import {
 } from "./util";
 
 const debug = debugModule("socket.io-redis-streams-adapter");
-
-const RESTORE_SESSION_MAX_XRANGE_CALLS = 100;
 
 export interface RedisStreamsAdapterOptions {
   /**
@@ -271,11 +268,19 @@ function isEphemeral(message: ClusterMessage) {
   );
 }
 
+const RESTORABLE_MESSAGE_TYPES = new Set<MessageType>([
+  MessageType.BROADCAST,
+  MessageType.SOCKETS_JOIN,
+  MessageType.SOCKETS_LEAVE,
+  MessageType.DISCONNECT_SOCKETS,
+]);
+
 class RedisStreamsAdapter extends ClusterAdapter {
   readonly #redisClient: any;
   readonly #opts: Required<RedisStreamsAdapterOptions>;
   readonly #streamName: string;
   readonly #publicChannel: string;
+  readonly #messageBuffer?: MessageBuffer;
 
   constructor(
     nsp: any,
@@ -306,6 +311,12 @@ class RedisStreamsAdapter extends ClusterAdapter {
         }
       );
     });
+
+    if (nsp.server.opts.connectionStateRecovery !== undefined) {
+      const maxMessages =
+        nsp.server.opts.connectionStateRecovery.maxMessages || 10_000;
+      this.#messageBuffer = new MessageBuffer(maxMessages);
+    }
   }
 
   override doPublish(message: ClusterMessage) {
@@ -387,6 +398,13 @@ class RedisStreamsAdapter extends ClusterAdapter {
       return debug("invalid format: %s", e.message);
     }
 
+    if (
+      this.nsp.server.opts.connectionStateRecovery !== undefined &&
+      RESTORABLE_MESSAGE_TYPES.has(message.type)
+    ) {
+      this.#messageBuffer.add(message, offset);
+    }
+
     this.onMessage(message, offset);
   }
 
@@ -446,13 +464,8 @@ class RedisStreamsAdapter extends ClusterAdapter {
 
     const sessionKey = this.#opts.sessionKeyPrefix + pid;
 
-    const results = await Promise.all([
-      GETDEL(this.#redisClient, sessionKey),
-      XRANGE(this.#redisClient, this.#streamName, offset, offset),
-    ]);
-
-    const rawSession = results[0][0];
-    const offsetExists = results[1][0];
+    const [rawSession] = await GETDEL(this.#redisClient, sessionKey);
+    const offsetExists = this.#messageBuffer.hasOffset(offset);
 
     if (!rawSession || !offsetExists) {
       return Promise.reject("session or offset not found");
@@ -464,33 +477,30 @@ class RedisStreamsAdapter extends ClusterAdapter {
 
     session.missedPackets = [];
 
-    // FIXME we need to add an arbitrary limit here, because if entries are added faster than what we can consume, then
-    // we will loop endlessly. But if we stop before reaching the end of the stream, we might lose messages.
-    for (let i = 0; i < RESTORE_SESSION_MAX_XRANGE_CALLS; i++) {
-      const entries = await XRANGE(
-        this.#redisClient,
-        this.#streamName,
-        RedisStreamsAdapter.nextOffset(offset),
-        "+"
-      );
-
-      if (entries.length === 0) {
-        break;
-      }
-
-      for (const entry of entries) {
-        if (entry.message.nsp === this.nsp.name && entry.message.type === "3") {
-          const message = RedisStreamsAdapter.decode(entry.message) as {
-            data: any;
-          };
-          const { packet, opts } = message.data;
-
-          if (shouldIncludePacket(session.rooms, opts)) {
-            packet.data.push(entry.id);
-            session.missedPackets.push(packet.data);
-          }
+    for (const entry of this.#messageBuffer.getFromOffset(offset)) {
+      const { message } = entry;
+      const messageOffset = entry.offset;
+      if (isSocketImpacted(session.rooms, message.data.opts)) {
+        switch (message.type) {
+          case MessageType.BROADCAST:
+            const packetData = message.data.packet.data;
+            packetData.push(messageOffset);
+            session.missedPackets.push(packetData);
+            break;
+          case MessageType.SOCKETS_JOIN:
+            session.rooms.push(...message.data.rooms);
+            break;
+          case MessageType.SOCKETS_LEAVE:
+            for (const room of message.data.rooms) {
+              const i = session.rooms.indexOf(room);
+              if (i !== -1) {
+                session.rooms.splice(i, 1);
+              }
+            }
+            break;
+          case MessageType.DISCONNECT_SOCKETS:
+            return Promise.reject("session was manually disconnected");
         }
-        offset = entry.id;
       }
     }
 
@@ -510,7 +520,13 @@ class RedisStreamsAdapter extends ClusterAdapter {
   }
 }
 
-function shouldIncludePacket(sessionRooms, opts) {
+function isSocketImpacted(
+  sessionRooms: string[],
+  opts: {
+    rooms: string[];
+    except: string[];
+  }
+) {
   const included =
     opts.rooms.length === 0 ||
     sessionRooms.some((room) => opts.rooms.indexOf(room) !== -1);
@@ -518,4 +534,90 @@ function shouldIncludePacket(sessionRooms, opts) {
     (room) => opts.except.indexOf(room) === -1
   );
   return included && notExcluded;
+}
+
+type RestorableMessage =
+  | {
+      type: MessageType.BROADCAST;
+      data: {
+        opts: {
+          rooms: string[];
+          except: string[];
+          flags: BroadcastFlags;
+        };
+        packet: {
+          data: any[];
+        };
+        requestId?: string;
+      };
+    }
+  | {
+      type: MessageType.SOCKETS_JOIN | MessageType.SOCKETS_LEAVE;
+      data: {
+        opts: {
+          rooms: string[];
+          except: string[];
+          flags: BroadcastFlags;
+        };
+        rooms: string[];
+      };
+    }
+  | {
+      type: MessageType.DISCONNECT_SOCKETS;
+      data: {
+        opts: {
+          rooms: string[];
+          except: string[];
+          flags: BroadcastFlags;
+        };
+        close?: boolean;
+      };
+    };
+
+class MessageBuffer {
+  readonly #messages: Array<{ offset: string; message: RestorableMessage }>;
+  readonly #capacity: number;
+  readonly #offsetMap = new Map<string, number>();
+  #writeIndex: number = 0;
+
+  constructor(capacity: number) {
+    this.#capacity = capacity;
+    this.#messages = new Array(capacity);
+  }
+
+  add(message: RestorableMessage, offset: string) {
+    const oldEntry = this.#messages[this.#writeIndex];
+
+    if (oldEntry) {
+      this.#offsetMap.delete(oldEntry.offset);
+    }
+
+    this.#messages[this.#writeIndex] = { offset, message };
+    this.#offsetMap.set(offset, this.#writeIndex);
+    this.#writeIndex = this.#nextIndex(this.#writeIndex);
+  }
+
+  #nextIndex(index: number) {
+    return (index + 1) % this.#capacity;
+  }
+
+  hasOffset(offset: string) {
+    return this.#offsetMap.has(offset);
+  }
+
+  *getFromOffset(offset: string) {
+    const offsetIndex = this.#offsetMap.get(offset);
+
+    if (offsetIndex === undefined) {
+      return;
+    }
+
+    for (
+      let index = this.#nextIndex(offsetIndex);
+      index !== this.#writeIndex;
+      index = this.#nextIndex(index)
+    ) {
+      yield this.#messages[index];
+    }
+  }
 }
